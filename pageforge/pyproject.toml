@@ -1,0 +1,28 @@
+[project]
+name = "pageforge"
+version = "0.2.0"
+description = "PageForge -- two-phase probe-discovery + implement RL environment (framework-agnostic; stdlib only, except the optional pytest leak-test suite)"
+requires-python = ">=3.11"
+# No third-party dependencies -- the environment, oracle, grader, probe server and
+# all proofs are pure Python stdlib. Drive it from any harness (see pageforge_env.py
+# and private/phase_demo.py).
+dependencies = []
+
+[tool.setuptools]
+py-modules = ["pageforge_env"]
+
+# DO NOT add `packages = ["generator"]` back.
+#
+# `generator` is the ORACLE (reference engine, differential engine, instance
+# generator, grader). Declaring it as a distribution package means a
+# non-editable `pip install .` COPIES it into site-packages, where it survives
+# purge_oracle() deleting the source tree: `import generator.engine` still
+# resolves, so the agent can read the answer while every disk-based check
+# reports "isolated". (An editable install is safe -- its finder points back at
+# the source tree, which the purge removes -- but the copy mode is not, and
+# nothing stops a host from choosing it.)
+#
+# Installing is optional anyway: PageForge has zero dependencies and the
+# no-install path (run from the package root) is the supported way to serve it.
+# assert_isolated() now also fails closed if `generator` is importable, so a
+# reintroduced copy is caught at serve time rather than at grade time.

@@ -1,0 +1,111 @@
+{
+  "env": "Latchwork",
+  "regime": "dense-gradient",
+  "target_frontier_mean_reward": [
+    0.35,
+    0.65
+  ],
+  "runtime_requirement": "out-of-process serving: purge the pipeline/generator source from the agent-reachable filesystem and expose only the lossy probe socket; the in-process Channel is for trusted offline evaluation only (see ISOLATION gate).",
+  "budget": 20000,
+  "n_seeds": 100,
+  "accept_threshold": 0.95,
+  "locked_config": {
+    "n_fields": 10,
+    "domain": 64,
+    "n_stages": 10,
+    "coupling": 0.8,
+    "form_weights": {
+      "INTERVAL": 1.0,
+      "SET": 1.0,
+      "MODULAR": 1.0,
+      "LINEAR": 1.0,
+      "ORDER": 1.0,
+      "DEPENDENCY": 1.0
+    },
+    "config_digest": "62d32e5e1d2b56b3"
+  },
+  "elapsed_s": 750.1,
+  "ALL_GATES_PASS": true,
+  "gates": {
+    "G0_determinism": {
+      "pass": true
+    },
+    "G10_differential_AB": {
+      "pass": true,
+      "disagreements": 0
+    },
+    "G1_gold_1.0": {
+      "pass": true,
+      "fails": 0,
+      "n": 100
+    },
+    "G2_identifiability": {
+      "pass": true,
+      "fails": 0
+    },
+    "G8_load_bearing": {
+      "pass": true,
+      "worst_single_stage_ablation": 0.909
+    },
+    "G3_FORCED_no_probe_walls": {
+      "pass": true,
+      "no_probe_max": 0.167,
+      "no_probe_mean": 0.018
+    },
+    "G4a_variant_indistinguishable": {
+      "pass": true,
+      "fraction": 1.0
+    },
+    "G4b_probe_and_fit_batch_below_band": {
+      "pass": true,
+      "batch_max": 0.337,
+      "batch_mean": 0.143
+    },
+    "G4c_rote_walls_with_margin": {
+      "pass": true,
+      "rote_max": 0.277,
+      "rote_mean": 0.128,
+      "margin_below_band": 0.023
+    },
+    "G5_adaptive_band_and_budget_insensitive": {
+      "pass": true,
+      "bounded_B_mean": 0.391,
+      "bounded_2B_mean": 0.373,
+      "budget_delta": 0.019,
+      "full_mean_recoverability": 0.58
+    },
+    "G6_class_form_agnostic": {
+      "pass": true,
+      "normalized_MI": 0.0027
+    },
+    "G7_small_shallow_pass_region": {
+      "pass": true,
+      "P_pass_ge_1": 0.1238,
+      "P_pass_ge_2": 0.022,
+      "P_pass_ge_3": 0.00567
+    },
+    "G9_probe_then_hardcode_floor": {
+      "pass": true,
+      "hardcode_max": 0.091,
+      "hardcode_mean": 0.091
+    },
+    "G11_reconstruct_and_regrade": {
+      "pass": true
+    },
+    "G12_disjoint_namespaces": {
+      "pass": true
+    },
+    "FAR_cheats": {
+      "pass": true,
+      "false_accepts": 0,
+      "n": 400,
+      "wilson_upper": 0.0095,
+      "scope": "WEAK SOLVERS over the lossy channel only (no in-process access to the pipeline); see ISOLATION_requires_out_of_process for the in-process adversary and the required mitigation."
+    },
+    "ISOLATION_requires_out_of_process": {
+      "pass": true,
+      "in_process_oracle_read_score": 1.0,
+      "requirement": "Serve OUT OF PROCESS: purge the pipeline/generator source from the agent-reachable filesystem, expose ONLY the probe socket, and verify unreadable by a runtime leak-probe. The in-process Channel is for trusted offline evaluation only. See README / docs/SPEC.md."
+    }
+  }
+}

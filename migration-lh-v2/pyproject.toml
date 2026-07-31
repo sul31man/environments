@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mig-lh"
+version = "0.8.0"
+description = "Long-horizon concurrency-safe online migration RL environment (semantic core = ratified 0.3.0 reducer)"
+requires-python = ">=3.9,<3.13"    # stdlib-only; verified on 3.9, 3.11, 3.12
+dependencies = []                   # env core is stdlib-only; platform integration is an optional deploy-time extra
+
+# Install NO package. The env runs from source: only the serve-safe modules are packaged;
+# the framework wrapper and selfchecks use sys.path. A non-editable `pip install .` must NOT
+# copy src/ into site-packages -- that would ship the hidden reference reducer
+# (dataplane / generator) where a disk purge cannot reach it.
+[tool.setuptools]
+packages = []
