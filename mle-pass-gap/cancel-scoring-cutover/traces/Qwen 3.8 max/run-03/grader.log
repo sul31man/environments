@@ -1,0 +1,16 @@
+{
+  "agree_pass": 0.999,
+  "current": {
+    "agreement": 0.0,
+    "ran": false,
+    "stderr": " File \"/tmp/candidate_jdb70lq3/target/run_scoring.py\", line 36, in <module>\n    main()\n  File \"/tmp/candidate_jdb70lq3/target/run_scoring.py\", line 26, in main\n    scores, fit_df, score_df = pipeline.run(cfg)\n                               ^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_jdb70lq3/target/src/riskscore/pipeline.py\", line 107, in run\n    fit_df, score_df = build(cfg)\n                       ^^^^^^^^^^\n  File \"/tmp/candidate_jdb70lq3/target/src/riskscore/pipeline.py\", line 31, in build\n    orders = labels.attach_label(orders, returns, cfg[\"labelling\"][\"window_days\"])\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_jdb70lq3/target/src/riskscore/labels.py\", line 6, in attach_label\n    raise NotImplementedError\nNotImplementedError\n"
+  },
+  "reference": {
+    "agreement": 0.0,
+    "ran": false,
+    "stderr": " File \"/tmp/candidate_jdb70lq3/target/run_scoring.py\", line 36, in <module>\n    main()\n  File \"/tmp/candidate_jdb70lq3/target/run_scoring.py\", line 26, in main\n    scores, fit_df, score_df = pipeline.run(cfg)\n                               ^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_jdb70lq3/target/src/riskscore/pipeline.py\", line 107, in run\n    fit_df, score_df = build(cfg)\n                       ^^^^^^^^^^\n  File \"/tmp/candidate_jdb70lq3/target/src/riskscore/pipeline.py\", line 31, in build\n    orders = labels.attach_label(orders, returns, cfg[\"labelling\"][\"window_days\"])\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_jdb70lq3/target/src/riskscore/labels.py\", line 6, in attach_label\n    raise NotImplementedError\nNotImplementedError\n"
+  },
+  "reward": 0.0,
+  "tolerance": 1e-06
+}
+Final score: 0.0

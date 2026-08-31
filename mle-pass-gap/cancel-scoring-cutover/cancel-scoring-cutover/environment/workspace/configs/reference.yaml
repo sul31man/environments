@@ -1,0 +1,31 @@
+# Accepted backtest. This is the configuration the published reference scores
+# were produced from; it scores the closing quarter of the fit window.
+paths:
+  data_dir: data
+
+windows:
+  fit:
+    from: "2009-12-01"
+    to: "2010-11-30"
+  score:
+    from: "2010-11-01"
+    to: "2010-11-30"
+
+labelling:
+  window_days: 90
+
+encoding:
+  columns: ["sku", "market"]
+  smoothing: 20.0
+
+segmentation:
+  n_segments: 6
+  seed: 11
+
+model:
+  seed: 3
+  max_iter: 400
+  regularisation: 0.5
+
+scoring:
+  hold_threshold: 0.08

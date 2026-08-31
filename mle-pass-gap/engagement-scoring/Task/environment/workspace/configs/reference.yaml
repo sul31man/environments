@@ -1,0 +1,23 @@
+# Accepted backtest. This is the configuration the published reference scores were
+# produced from; it scores the closing stretch of the fit window.
+paths:
+  data_dir: data
+
+windows:
+  fit:
+    from: "2000-04-25"
+    to: "2000-11-22"
+  score:
+    from: "2000-11-22"
+    to: "2000-11-22"
+
+encoding:
+  smoothing: 12.0
+
+model:
+  seed: 5
+  max_iter: 400
+  regularisation: 0.4
+
+scoring:
+  promote_threshold: 0.62

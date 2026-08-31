@@ -1,0 +1,16 @@
+{
+  "agree_pass": 0.999,
+  "current": {
+    "agreement": 0.0,
+    "ran": false,
+    "stderr": "mp/candidate_anbxmzp_/target/run_scoring.py\", line 35, in <module>\n    main()\n  File \"/tmp/candidate_anbxmzp_/target/run_scoring.py\", line 25, in main\n    scores, fit_df, score_df = pipeline.run(cfg)\n                               ^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_anbxmzp_/target/src/engagement/pipeline.py\", line 56, in run\n    fit_df, score_df = build(cfg)\n                       ^^^^^^^^^^\n  File \"/tmp/candidate_anbxmzp_/target/src/engagement/pipeline.py\", line 36, in build\n    occupation_rates = cohort.rates(fit_source, \"f_occupation\", smoothing, level[\"rate\"])\n                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_anbxmzp_/target/src/engagement/cohort.py\", line 7, in rates\n    raise NotImplementedError\nNotImplementedError\n"
+  },
+  "reference": {
+    "agreement": 0.0,
+    "ran": false,
+    "stderr": "mp/candidate_anbxmzp_/target/run_scoring.py\", line 35, in <module>\n    main()\n  File \"/tmp/candidate_anbxmzp_/target/run_scoring.py\", line 25, in main\n    scores, fit_df, score_df = pipeline.run(cfg)\n                               ^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_anbxmzp_/target/src/engagement/pipeline.py\", line 56, in run\n    fit_df, score_df = build(cfg)\n                       ^^^^^^^^^^\n  File \"/tmp/candidate_anbxmzp_/target/src/engagement/pipeline.py\", line 36, in build\n    occupation_rates = cohort.rates(fit_source, \"f_occupation\", smoothing, level[\"rate\"])\n                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_anbxmzp_/target/src/engagement/cohort.py\", line 7, in rates\n    raise NotImplementedError\nNotImplementedError\n"
+  },
+  "reward": 0.0,
+  "tolerance": 1e-06
+}
+Final score: 0.0

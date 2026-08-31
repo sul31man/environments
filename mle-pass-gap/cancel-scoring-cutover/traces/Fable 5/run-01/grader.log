@@ -1,0 +1,16 @@
+{
+  "agree_pass": 0.999,
+  "current": {
+    "agreement": 1.0,
+    "note": "37303 of 37303 rows within 1e-06",
+    "ran": true
+  },
+  "reference": {
+    "agreement": 1.0,
+    "note": "25806 of 25806 rows within 1e-06",
+    "ran": true
+  },
+  "reward": 1.0,
+  "tolerance": 1e-06
+}
+Final score: 1.0

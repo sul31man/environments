@@ -1,0 +1,22 @@
+schema_version = "1.1"
+
+[task]
+name = "cancel-scoring-cutover"
+description = "Move a pinned return-risk scoring service onto a current runtime without changing what it computes."
+keywords = ["long-horizon", "ml-engineering", "migration", "pandas", "scikit-learn"]
+
+[verifier]
+timeout_sec = 2400.0
+user = "root"
+
+[agent]
+timeout_sec = 9000.0                       # 150 min standard
+user = "ubuntu"
+
+[environment]
+build_timeout_sec = 3600.0
+cpus = 2
+memory_mb = 7168
+storage_mb = 10240
+gpus = 0
+allow_internet = false

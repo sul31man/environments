@@ -1,0 +1,33 @@
+{
+  "run": 1,
+  "container": "harbor-engagement-scoring-run",
+  "reward": 1.0,
+  "reason": "",
+  "grader_exit": 0,
+  "net": {},
+  "drive": {
+    "steps": 112,
+    "tool_calls": 110,
+    "stop": "finish() called",
+    "wall_sec": 2961.7,
+    "tokens": {
+      "in": 743112,
+      "out": 244055,
+      "cache_read": 4826724,
+      "cache_write": 0
+    },
+    "est_cost_usd": 4.365097,
+    "counts": {
+      "bash": 96,
+      "write_file": 13,
+      "finish": 1,
+      "other": 0
+    },
+    "model": "qwen3.8-max",
+    "provider": "hud",
+    "arm": "weak",
+    "reasoning": "xhigh",
+    "requests": 112,
+    "prices_version": "hud-2026-08-21"
+  }
+}

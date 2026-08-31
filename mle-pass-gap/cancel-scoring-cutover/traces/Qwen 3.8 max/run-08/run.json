@@ -1,0 +1,33 @@
+{
+  "run": 1,
+  "container": "harbor-cancel-scoring-cutover-run",
+  "reward": 0.0,
+  "reason": "",
+  "grader_exit": 0,
+  "net": {},
+  "drive": {
+    "steps": 150,
+    "tool_calls": 154,
+    "stop": "max steps reached",
+    "wall_sec": 4717.6,
+    "tokens": {
+      "in": 7565702,
+      "out": 255896,
+      "cache_read": 5091408,
+      "cache_write": 0
+    },
+    "est_cost_usd": 18.836614,
+    "counts": {
+      "bash": 154,
+      "write_file": 0,
+      "finish": 0,
+      "other": 0
+    },
+    "model": "qwen3.8-max",
+    "provider": "hud",
+    "arm": "weak",
+    "reasoning": "xhigh",
+    "requests": 150,
+    "prices_version": "hud-2026-08-21"
+  }
+}

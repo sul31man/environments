@@ -1,0 +1,488 @@
+[
+  {
+    "role": "system",
+    "content": "Maintenance control wants the grounding risk scorer back. A migration stripped five modules\nout of `src/fleetrisk/` and never restored them, so every function in those five raises\n`NotImplementedError` and nothing runs.\n\nRebuild them. The service has to reproduce its last accepted run to the last decimal, on\nboth of the scheduled configurations:\n\n    python3 run_scoring.py --config configs/reference.yaml --out out/reference\n    python3 run_scoring.py --config configs/current.yaml   --out out/current\n\n`configs/reference.yaml` is the accepted backtest and the only one you can check yourself\nagainst. What it produced before the migration is in `reference/`: the score for every\nflight it touched, and the summary the run wrote beside them. `tools/compare_scores.py`\ndiffs a pair of score files.\n\n`configs/current.yaml` runs the live scoring period off the same history. It scores flying\nfrom well after the end of that history, and nothing is published for it, so nothing will\ntell you whether you have that one right.\n\n`SPEC.md` is the contract the desk signed off. It describes every published quantity in the\nterms operations uses and deliberately carries no formulas, so where a definition could go\nmore than one way, the published run decides it.\n\nThe other modules, the configs and the export are not part of the job. Leave them alone.\n\n\n---\nYOU ARE RUNNING IN A CONTAINER via a harness. Tools:\n  bash(cmd)               - run a command in your working directory\n  write_file(path,content)- write a file (relative paths -> working dir)\n  finish()                - end the episode; the grader then runs\nThe filesystem persists across calls; each bash call is a fresh shell. Do the work, then call finish(). If you stop calling tools, the episode ends and grading runs."
+  },
+  {
+    "role": "user",
+    "content": "Begin. Complete the task, then call finish()."
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_01NjCtrdxYAiZd7iTCRjTgHy",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"find . -type f | head -50; echo ---; cat SPEC.md\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01NjCtrdxYAiZd7iTCRjTgHy",
+    "name": "bash",
+    "content": "./run_scoring.py\n./reference/scores_reference.csv\n./reference/run_report.json\n./SPEC.md\n./src/fleetrisk/portfolio.py\n./src/fleetrisk/__init__.py\n./src/fleetrisk/deviations.py\n./src/fleetrisk/schema.py\n./src/fleetrisk/report.py\n./src/fleetrisk/pipeline.py\n./src/fleetrisk/tail_history.py\n./src/fleetrisk/observation.py\n./src/fleetrisk/config.py\n./src/fleetrisk/model.py\n./src/fleetrisk/route_feats.py\n./src/fleetrisk/assemble.py\n./src/fleetrisk/calendar_feats.py\n./src/fleetrisk/reliability.py\n./src/fleetrisk/station_profile.py\n./src/fleetrisk/validate.py\n./src/fleetrisk/io_layer.py\n./src/fleetrisk/recent.py\n./src/fleetrisk/station_history.py\n./src/fleetrisk/fleet_profile.py\n./data/groundings.csv.gz\n./data/fleet.csv\n./data/stations.csv\n./data/flights.csv.gz\n./tools/compare_scores.py\n./README.md\n./configs/reference.yaml\n./configs/current.yaml\n---\n# Fleet grounding risk: specification\n\nThis says what the service is for and what each published quantity means. It is written\nthe way the operations desk describes its own model, in business terms.\n\n**It gives no formulas.** Where a definition could reasonably be written more than one way,\nthe published backtest settles it: `reference/scores_reference.csv` is what the service\nproduced on that run and `reference/run_report.json` is the summary it wrote beside it. A\ncorrect rebuild reproduces both.\n\n---\n\n## 1. Run shape\n\nA run reads the export, fits on the **fit window** and scores the **score window**, both\nnamed in the run configuration and inclusive of the last second of their end date.\n\nFlights are processed in `flight_id` order. Everything the service knows about an aircraft,\na station, a route or an operator is learned from the **fit window only**.\n\n## 2. What the service is predicting\n\nA flight is **at risk** if the aircraft that flew it is grounded within\n`labelling.window_days` days of leaving. Groundings are exported separately, in\n`data/groundings.csv.gz`; they are not in the flight log, because a grounded flight never\noperated.\n\n## 3. What the service fits on\n\nThe service does not fit on every flight in the fit window.\n\nA flight is only usable for fitting if its outcome is already settled by the history the\nservice is allowed to read. Which flights that leaves out, and on what grounds, is part of\nthe rebuild.\n\n## 4. What the features mean\n\nThirty-eight quantities are published, in the order `src/fleetrisk/assemble.py` declares them.\n\n**Departure.** When the flight was scheduled out: hour, day of week, month, week of year,\nwhether it fell at a weekend, and how far into the exported period it sits.\n\n**The leg.** What the flight looks like on paper and how it actually ran: distance, block\ntime, taxi out, departure and arrival delay, whether it was diverted, and the average speed\nits block time implies.\n\n**The aircraft on paper.** From the fleet register: which operator it belongs to, whether it\nleft from its home station, and how many aircraft that operator runs.\n\n**The stations.** From the station reference: the state at each end and whether both ends\nsit in the same state.\n\n**Aircraft record.** What the fit window knows about the airframe: how much it flew, how\noften it was grounded, how often that was per flight, how long since the last grounding,\nhow long it has been in the exported fleet, and its usual departure delay.\n\n**Station record.** The same idea for the airports at each end: how much flew from there and\nhow often aircraft based there were grounded.\n\n**Reliability.** How often flights of this operator, this route and this departure station\nturned out to be at risk. A rate over thin history is unreliable, so it is pulled toward the\nfleet rate in proportion to how little history stands behind it; `encoding.smoothing` sets\nhow hard.\n\n**Recent form.** How the aircraft has been behaving lately rather than over the whole\nwindow: its grounding rate over the last fortnight, how long since it last flew, and its\ndeparture delay over its last `recent.flights` legs.\n\n**Against the fleet.** How the aircraft, its departure station and its operator sit against\nthe fleet rate.\n\n## 5. Rows with no history behind them\n\nPlenty of airframes go the whole fit window without being grounded once. Their \"how long\nsince the last grounding\" is not a large number and it is not zero; there is no such date to\nmeasure from. The service marks those with **-1** rather than inventing a gap.\n\nA live run also carries legs the fit window has nothing at all on: an airframe that joined\nafter the history ends, a station or a route that never appears in it. Those legs are still\nscored. Wherever a quantity is a rate, an average or a span taken over history the leg does\nnot have, the service puts the fleet-wide level for that quantity in its place, so the leg\nsits at the fleet average rather than at zero. Counts are the exception. An aircraft the\nhistory has never seen has flown no flights and been grounded no times, and those are\nrecorded as such. Time since the last grounding follows the paragraph above.\n\n## 6. Model\n\nGradient boosting over the thirty-eight features, fitted on the fit window against the label, using\n`model.seed`, `model.max_iter`, `model.learning_rate` and `model.max_depth`. Values that are\nnot finite are treated as zero before fitting.\n\n## 7. Output\n\nOne row per scored flight, in `flight_id` order, carrying `flight_id`, `tail_number`,\n`departed_at`, `risk_score` and `watch`.\n\n`risk_score` is the modelled probability that the flight is at risk, rounded to six decimal\nplaces. `watch` is 1 when the unrounded score is at least `scoring.watch_threshold`.\n\nA run also writes a summary beside the scores. The summary is not graded."
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_01RpscEH4L89eE2PugFZ4JiP",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"cd src/fleetrisk && wc -l *.py && head -100 __init__.py pipeline.py\"}"
+        }
+      },
+      {
+        "id": "toolu_01BPUEkgKR442nQQdmRKSobE",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"cat run_scoring.py configs/reference.yaml configs/current.yaml README.md tools/compare_scores.py\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01RpscEH4L89eE2PugFZ4JiP",
+    "name": "bash",
+    "content": "1 __init__.py\n   18 assemble.py\n   17 calendar_feats.py\n   47 config.py\n   14 deviations.py\n   20 fleet_profile.py\n   27 io_layer.py\n   31 model.py\n   13 observation.py\n   85 pipeline.py\n   22 portfolio.py\n   11 recent.py\n   23 reliability.py\n   19 report.py\n   19 route_feats.py\n   28 schema.py\n    9 station_history.py\n   18 station_profile.py\n   13 tail_history.py\n   17 validate.py\n  452 total\n==> __init__.py <==\n\"\"\"Fleet grounding risk scoring service.\"\"\"\n\n==> pipeline.py <==\n\"\"\"Fits on the fit window and scores the window the run config names.\"\"\"\nfrom __future__ import annotations\n\nimport numpy as np\nimport pandas as pd\n\nfrom . import (assemble, calendar_feats, deviations, fleet_profile, io_layer,\n               model, observation, portfolio, recent, reliability, route_feats,\n               station_history, station_profile, tail_history)\n\n\ndef _window(df, spec):\n    lo = pd.Timestamp(spec[\"from\"])\n    hi = pd.Timestamp(spec[\"to\"]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)\n    return df[(df[\"departed_at\"] >= lo) & (df[\"departed_at\"] <= hi)]\n\n\ndef build(cfg):\n    flights = io_layer.read_flights(cfg)\n    groundings = io_layer.read_groundings(cfg)\n    fleet = io_layer.read_fleet(cfg)\n    stations = io_layer.read_stations(cfg)\n\n    window_days = cfg[\"labelling\"][\"window_days\"]\n    export_end = flights[\"departed_at\"].max()\n    period_start = flights[\"departed_at\"].min()\n\n    labelled = observation.attach_label(flights, groundings, window_days)\n    labelled = labelled.sort_values(\"flight_id\", kind=\"stable\").reset_index(drop=True)\n\n    fit_raw = _window(labelled, cfg[\"windows\"][\"fit\"])\n    fit_raw = fit_raw[observation.observed(fit_raw, cfg[\"windows\"][\"fit\"],\n                                          export_end, window_days)]\n    fit_raw = fit_raw.reset_index(drop=True)\n    score_raw = _window(labelled, cfg[\"windows\"][\"score\"]).reset_index(drop=True)\n\n    fit_end = fit_raw[\"departed_at\"].max()\n    levels = portfolio.levels(fit_raw, groundings, fit_end)\n    hist = tail_history.history(fit_raw, groundings, fit_end)\n\n    def prepare(frame):\n        out = calendar_feats.add(frame, period_start)\n        out = route_feats.add(out)\n        out = fleet_profile.add(out, fleet)\n        out = station_profile.add(out, stations)\n        out = tail_history.add(out, hist, levels)\n        out = station_history.add(out, fit_raw, groundings, fleet, fit_end, levels)\n        out = recent.add(out, fit_raw, groundings, fit_end, levels)\n        return out\n\n    fit_df = prepare(fit_raw)\n    score_df = prepare(score_raw)\n\n    smoothing = cfg[\"encoding\"][\"smoothing\"]\n    base = levels[\"rate\"]\n    operator_rates = reliability.rate_table(fit_df, \"operator\", smoothing, base)\n    fit_df = fit_df.assign(_route=reliability.route_key(fit_df))\n    score_df = score_df.assign(_route=reliability.route_key(score_df))\n    route_rates = reliability.rate_table(fit_df, \"_route\", smoothing, base)\n    station_rates = reliability.rate_table(fit_df, \"origin\", smoothing, base)\n\n    fit_df = reliability.add(fit_df, operator_rates, route_rates, station_rates)\n    score_df = reliability.add(score_df, operator_rates, route_rates, station_rates)\n    fit_df = deviations.add(fit_df, levels)\n    score_df = deviations.add(score_df, levels)\n    return fit_df.drop(columns=[\"_route\"]), score_df.drop(columns=[\"_route\"])\n\n\ndef run(cfg):\n    fit_df, score_df = build(cfg)\n\n    mdl = model.RiskModel(cfg[\"model\"][\"seed\"], cfg[\"model\"][\"max_iter\"],\n                          cfg[\"model\"][\"learning_rate\"], cfg[\"model\"][\"max_depth\"])\n    mdl.fit(assemble.matrix(fit_df), fit_df[\"label\"].astype(\"int64\").to_numpy())\n\n    risk = mdl.score(assemble.matrix(score_df))\n    threshold = float(cfg[\"scoring\"][\"watch_threshold\"])\n    out = pd.DataFrame({\n        \"flight_id\": score_df[\"flight_id\"].astype(str).to_numpy(),\n        \"tail_number\": score_df[\"tail_number\"].astype(str).to_numpy(),\n        \"departed_at\": score_df[\"departed_at\"].to_numpy(),\n        \"risk_score\": np.round(risk, 6),\n        \"watch\": (risk >= threshold).astype(\"int64\"),\n    })\n    return out, fit_df, score_df"
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01BPUEkgKR442nQQdmRKSobE",
+    "name": "bash",
+    "content": "#!/usr/bin/env python3\n\"\"\"Nightly entry point.\n\n    python3 run_scoring.py --config configs/reference.yaml --out out/\n\"\"\"\nimport argparse\nimport sys\nfrom pathlib import Path\n\nsys.path.insert(0, str(Path(__file__).resolve().parent / \"src\"))\n\nfrom fleetrisk import config, pipeline, report, validate\n\n\ndef main():\n    ap = argparse.ArgumentParser()\n    ap.add_argument(\"--config\", required=True)\n    ap.add_argument(\"--out\", required=True)\n    args = ap.parse_args()\n\n    cfg = config.load(args.config)\n    out_dir = Path(args.out)\n    out_dir.mkdir(parents=True, exist_ok=True)\n\n    scores, fit_df, score_df = pipeline.run(cfg)\n    validate.check(scores)\n\n    scores.to_csv(out_dir / \"scores.csv\", index=False)\n    report.write(out_dir / \"run_report.json\",\n                 report.summarise(scores, cfg))\n    print(\"scored %d rows, watching %d\" % (len(scores), int(scores[\"watch\"].sum())))\n\n\nif __name__ == \"__main__\":\n    main()\n# Accepted backtest. The published reference scores came from this config.\npaths:\n  data_dir: data\n\nwindows:\n  fit:\n    from: \"2024-01-01\"\n    to: \"2024-02-15\"\n  score:\n    from: \"2024-02-05\"\n    to: \"2024-02-08\"\n\nlabelling:\n  window_days: 3\n\nencoding:\n  smoothing: 50.0\n\nrecent:\n  flights: 20\n\nmodel:\n  seed: 5\n  max_iter: 200\n  learning_rate: 0.08\n  max_depth: 6\n\nscoring:\n  watch_threshold: 0.08\n# Live run for the current scoring period.\npaths:\n  data_dir: data\n\nwindows:\n  fit:\n    from: \"2024-01-01\"\n    to: \"2024-02-15\"\n  score:\n    from: \"2024-03-25\"\n    to: \"2024-03-31\"\n\nlabelling:\n  window_days: 3\n\nencoding:\n  smoothing: 50.0\n\nrecent:\n  flights: 20\n\nmodel:\n  seed: 5\n  max_iter: 200\n  learning_rate: 0.08\n  max_depth: 6\n\nscoring:\n  watch_threshold: 0.08\n# Fleet grounding risk service\n\nMaintenance control runs this against the overnight operations export. It puts a number on\nevery leg that flew: how likely is it that this airframe gets grounded in the next few days.\nAnything over the watch threshold gets pulled forward for a check before it strands a crew.\n\n    python3 run_scoring.py --config configs/reference.yaml --out out/reference\n\n## Layout\n\n    run_scoring.py        nightly entry point\n    SPEC.md               what the service computes, and what each quantity means\n    configs/              run configuration, one file per scheduled run\n    data/                 the overnight export\n    src/fleetrisk/        the service\n    reference/            the published output from the accepted backtest\n    tools/                helper for comparing two runs\n\n## The export\n\nTwo feeds, and they do not overlap.\n\n`data/flights.csv.gz` is the flight log: one row per leg that actually operated, with the\nschedule, the delays and the airframe that flew it.\n\n`data/groundings.csv.gz` comes off the ops system instead. It records cancellations, with\nthe tail number and the time. A cancelled leg never operated, so it is not in the flight log\nat all, and the two feeds have to be matched up before you can say which flights turned out\nbadly.\n\n`data/fleet.csv` is the airframe register and `data/stations.csv` the airport reference.\nBoth are slow moving.\n\nThe export is a rolling pull. It starts at a fixed date and stops on whichever day it was\ntaken, which is worth keeping in mind when reading anything derived from it.\n\nAirframes join and leave the fleet and stations come and go, so a live run will always\ncarry legs whose aircraft or departure station the history has never seen. `SPEC.md` says\nwhat the desk does with those.\n\n## The two scheduled runs\n\nThe backtest, `configs/reference.yaml`, is the one that has been signed off. What it\nproduced last time is under `reference/`: the scores themselves and the run summary.\n\nThe live run, `configs/current.yaml`, fits on the same history and scores a stretch of flying\nfrom well after the end of it. Nothing is published for it, so the only run you can check\nyourself is the backtest.\n#!/usr/bin/env python3\n\"\"\"Diff two score files by flight_id.\n\n    python3 tools/compare_scores.py a/scores.csv b/scores.csv\n\"\"\"\nimport argparse\n\nimport pandas as pd\n\nTOLERANCE = 1e-6\n\n\ndef main():\n    ap = argparse.ArgumentParser()\n    ap.add_argument(\"left\")\n    ap.add_argument(\"right\")\n    args = ap.parse_args()\n    left = pd.read_csv(args.left)\n    right = pd.read_csv(args.right)\n    merged = left[[\"flight_id\", \"risk_score\"]].merge(\n        right[[\"flight_id\", \"risk_score\"]], on=\"flight_id\", how=\"outer\",\n        suffixes=(\"_left\", \"_right\"))\n    diff = (merged[\"risk_score_left\"] - merged[\"risk_score_right\"]).abs()\n    same = (diff <= TOLERANCE).fillna(False)\n    print(\"rows %d, agree %d (%.6f), max abs diff %.6g\"\n          % (len(merged), int(same.sum()), same.mean(), float(diff.max())))\n    worst = merged.assign(diff=diff).sort_values(\"diff\", ascending=False).head(10)\n    print(worst.to_string(index=False))\n\n\nif __name__ == \"__main__\":\n    main()"
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_01XQmLqu7kgNdWtqrVpNrP5w",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"cd src/fleetrisk && cat assemble.py calendar_feats.py config.py deviations.py fleet_profile.py io_layer.py model.py observation.py\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01XQmLqu7kgNdWtqrVpNrP5w",
+    "name": "bash",
+    "content": "\"\"\"Design matrix assembly.\"\"\"\nfrom __future__ import annotations\n\nimport numpy as np\nimport pandas as pd\n\ntry:\n    from .schema import FEATURES\nexcept ImportError:\n    from schema import FEATURES\n\n\ndef matrix(df):\n    \"\"\"The published features, in the declared order, as a float matrix.\"\"\"\n    missing = [name for name in FEATURES if name not in df.columns]\n    if missing:\n        raise KeyError(\"design matrix is missing %s\" % \", \".join(missing))\n    return df[list(FEATURES)].astype(\"float64\").to_numpy()\n\"\"\"When the flight was scheduled to leave.\"\"\"\nfrom __future__ import annotations\n\nimport numpy as np\nimport pandas as pd\n\n\ndef add(df, period_start):\n    out = df.copy()\n    when = out[\"departed_at\"]\n    out[\"f_hour\"] = when.dt.hour.astype(\"float64\")\n    out[\"f_dow\"] = when.dt.dayofweek.astype(\"float64\")\n    out[\"f_month\"] = when.dt.month.astype(\"float64\")\n    out[\"f_week\"] = when.dt.isocalendar().week.astype(\"float64\").to_numpy()\n    out[\"f_is_weekend\"] = (when.dt.dayofweek >= 5).astype(\"float64\")\n    out[\"f_days_into_period\"] = (when - period_start).dt.total_seconds() / 86400.0\n    return out\n\"\"\"Run configuration.\"\"\"\nfrom __future__ import annotations\n\nimport copy\nfrom pathlib import Path\nfrom typing import Any, Dict\n\nimport yaml\n\nROOT = Path(__file__).resolve().parents[1]\n\nDEFAULTS: Dict[str, Any] = {\n    \"paths\": {\"data_dir\": \"data\"},\n    \"labelling\": {\"window_days\": 3},\n    \"encoding\": {\"smoothing\": 50.0},\n    \"recent\": {\"flights\": 20},\n    \"model\": {\"seed\": 5, \"max_iter\": 200, \"learning_rate\": 0.08, \"max_depth\": 6},\n    \"scoring\": {\"watch_threshold\": 0.25},\n}\n\n\nclass ConfigError(RuntimeError):\n    \"\"\"Raised when the run configuration cannot be used as written.\"\"\"\n\n\ndef _merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:\n    out = copy.deepcopy(base)\n    for key, value in (override or {}).items():\n        if isinstance(value, dict) and isinstance(out.get(key), dict):\n            out[key] = _merge(out[key], value)\n        else:\n            out[key] = value\n    return out\n\n\ndef load(path: str) -> Dict[str, Any]:\n    raw = yaml.safe_load(Path(path).read_text()) or {}\n    cfg = _merge(DEFAULTS, raw)\n    for section in (\"windows\",):\n        if section not in cfg:\n            raise ConfigError(\"config is missing the %s section\" % section)\n    return cfg\n\n\ndef data_path(name: str, cfg: Dict[str, Any] | None = None) -> Path:\n    base = Path((cfg or DEFAULTS)[\"paths\"][\"data_dir\"])\n    return base / name\n\"\"\"How this aircraft, station and operator sit against the fleet as a whole.\"\"\"\nfrom __future__ import annotations\n\nimport numpy as np\nimport pandas as pd\n\n\ndef add(df, portfolio):\n    out = df.copy()\n    base = float(portfolio[\"rate\"])\n    out[\"f_tail_vs_portfolio\"] = (out[\"f_tail_grounding_rate\"] - base).astype(\"float64\")\n    out[\"f_origin_vs_portfolio\"] = (out[\"f_origin_grounding_rate\"] - base).astype(\"float64\")\n    out[\"f_operator_vs_portfolio\"] = (out[\"f_operator_rate\"] - base).astype(\"float64\")\n    return out\n\"\"\"What the register says about the aircraft flying this leg.\"\"\"\nfrom __future__ import annotations\n\nimport numpy as np\nimport pandas as pd\n\n\ndef add(df, fleet):\n    reg = fleet.set_index(\"tail_number\")\n    operators = sorted(fleet[\"operator\"].dropna().unique())\n    codes = {name: float(i) for i, name in enumerate(operators)}\n    sizes = fleet.groupby(\"operator\")[\"tail_number\"].nunique()\n\n    out = df.copy()\n    home = out[\"tail_number\"].map(reg[\"home_station\"])\n    carrier = out[\"tail_number\"].map(reg[\"operator\"]).fillna(out[\"operator\"])\n    out[\"f_operator\"] = carrier.map(codes).fillna(-1.0).astype(\"float64\")\n    out[\"f_from_home\"] = (out[\"origin\"] == home).astype(\"float64\")\n    out[\"f_fleet_size\"] = carrier.map(sizes).fillna(0.0).astype(\"float64\")\n    return out\n\"\"\"Reads the nightly operations export.\"\"\"\nfrom __future__ import annotations\n\nimport pandas as pd\n\ntry:\n    from .config import data_path\nexcept ImportError:\n    from config import data_path\n\n\ndef read_flights(cfg):\n    df = pd.read_csv(data_path(\"flights.csv.gz\", cfg), parse_dates=[\"departed_at\"])\n    return df.sort_values(\"flight_id\", kind=\"stable\").reset_index(drop=True)\n\n\ndef read_groundings(cfg):\n    df = pd.read_csv(data_path(\"groundings.csv.gz\", cfg), parse_dates=[\"occurred_at\"])\n    return df.sort_values([\"occurred_at\", \"tail_number\"], kind=\"stable\").reset_index(drop=True)\n\n\ndef read_fleet(cfg):\n    return pd.read_csv(data_path(\"fleet.csv\", cfg))\n\n\ndef read_stations(cfg):\n    return pd.read_csv(data_path(\"stations.csv\", cfg))\n\"\"\"Estimator.\"\"\"\nfrom __future__ import annotations\n\nfrom typing import Any, Tuple\n\nimport numpy as np\nimport pandas as pd\nfrom sklearn.ensemble import HistGradientBoostingClassifier\n\n\nclass RiskModel(object):\n\n    def __init__(self, seed, max_iter, learning_rate, max_depth):\n        self.seed = int(seed)\n        self.max_iter = int(max_iter)\n        self.learning_rate = float(learning_rate)\n        self.max_depth = int(max_depth)\n        self.clf_ = None\n\n    def fit(self, X, y):\n        \"\"\"Values that are not finite are carried as zero.\"\"\"\n        self.clf_ = HistGradientBoostingClassifier(\n            max_iter=self.max_iter, learning_rate=self.learning_rate,\n            max_depth=self.max_depth, random_state=self.seed,\n            early_stopping=False)\n        self.clf_.fit(np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0), y)\n        return self\n\n    def score(self, X):\n        return self.clf_.predict_proba(\n            np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0))[:, 1]\n\"\"\"Labelling, and the subset of the export the desk fits on.\"\"\"\nfrom __future__ import annotations\n\nimport numpy as np\nimport pandas as pd\n\n\ndef attach_label(flights, groundings, window_days):\n    raise NotImplementedError\n\n\ndef observed(df, fit_spec, export_end, window_days):\n    raise NotImplementedError"
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_01RVr767h7TWtzXK8hJVibrD",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"cd src/fleetrisk && cat portfolio.py recent.py reliability.py report.py route_feats.py schema.py station_history.py station_profile.py tail_history.py validate.py\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01RVr767h7TWtzXK8hJVibrD",
+    "name": "bash",
+    "content": "\"\"\"Fleet-wide levels, used wherever a row has no history of its own.\"\"\"\nfrom __future__ import annotations\n\nimport numpy as np\nimport pandas as pd\n\n\ndef levels(fit_flights, groundings, fit_end):\n    \"\"\"One fallback number per quantity, taken over the whole fit window.\"\"\"\n    seen = groundings[groundings[\"occurred_at\"] <= pd.Timestamp(fit_end)]\n    per_tail = fit_flights.groupby(\"tail_number\").agg(\n        flights=(\"flight_id\", \"size\"), first_seen=(\"departed_at\", \"min\"),\n        last_seen=(\"departed_at\", \"max\"))\n    tenure = (pd.Timestamp(fit_end) - per_tail[\"first_seen\"]).dt.total_seconds() / 86400.0\n    gap = (pd.Timestamp(fit_end) - per_tail[\"last_seen\"]).dt.total_seconds() / 86400.0\n    return {\n        \"rate\": float(len(seen)) / max(float(len(fit_flights)), 1.0),\n        \"tenure\": float(tenure.mean()),\n        \"gap\": float(gap.mean()),\n        \"dep_delay\": float(pd.to_numeric(fit_flights[\"departure_delay\"],\n                                         errors=\"coerce\").mean()),\n    }\n\"\"\"How the aircraft has been behaving lately, rather than over the whole window.\"\"\"\nfrom __future__ import annotations\n\nimport numpy as np\nimport pandas as pd\n\nRECENT_FLIGHTS = 20\n\n\ndef add(df, fit_flights, groundings, fit_end, portfolio):\n    raise NotImplementedError\n\"\"\"Grounding rates by operator, by route and by station.\n\nA rate over thin history says more about the thinness than about the risk, so each one\nis pulled toward the portfolio rate in proportion to how little stands behind it.\n\"\"\"\nfrom __future__ import annotations\n\nimport numpy as np\nimport pandas as pd\n\nCATCH_ALL = \"__unseen__\"\n\n\ndef rate_table(fit_df, key, smoothing, prior):\n    raise NotImplementedError\n\n\ndef route_key(df):\n    raise NotImplementedError\n\n\ndef add(df, operator_rates, route_rates, station_rates):\n    raise NotImplementedError\n\"\"\"Run summary written beside the scores.\"\"\"\nfrom __future__ import annotations\n\nimport json\nfrom pathlib import Path\n\n\ndef summarise(scores, cfg):\n    return {\n        \"fit_window\": dict(cfg[\"windows\"][\"fit\"]),\n        \"score_window\": dict(cfg[\"windows\"][\"score\"]),\n        \"rows_scored\": int(len(scores)),\n        \"watch_rate\": round(float(scores[\"watch\"].mean()), 6),\n        \"mean_score\": round(float(scores[\"risk_score\"].mean()), 6),\n    }\n\n\ndef write(path, payload):\n    Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + \"\\n\")\n\"\"\"What the flight itself looks like on paper and how it actually ran.\"\"\"\nfrom __future__ import annotations\n\nimport numpy as np\nimport pandas as pd\n\n\ndef add(df):\n    out = df.copy()\n    block = pd.to_numeric(out[\"block_minutes\"], errors=\"coerce\")\n    distance = pd.to_numeric(out[\"distance_miles\"], errors=\"coerce\")\n    out[\"f_distance\"] = distance.astype(\"float64\")\n    out[\"f_block_minutes\"] = block.astype(\"float64\")\n    out[\"f_taxi_out\"] = pd.to_numeric(out[\"taxi_out_minutes\"], errors=\"coerce\").astype(\"float64\")\n    out[\"f_departure_delay\"] = pd.to_numeric(out[\"departure_delay\"], errors=\"coerce\").astype(\"float64\")\n    out[\"f_arrival_delay\"] = pd.to_numeric(out[\"arrival_delay\"], errors=\"coerce\").astype(\"float64\")\n    out[\"f_diverted\"] = out[\"diverted\"].astype(\"float64\")\n    out[\"f_block_speed\"] = np.where(block > 0, distance / (block / 60.0), 0.0).astype(\"float64\")\n    return out\n\"\"\"Column names and the published feature order.\"\"\"\nfrom __future__ import annotations\n\nfrom typing import List\n\nFLIGHT_ID = \"flight_id\"\nTAIL = \"tail_number\"\nDEPARTED = \"departed_at\"\nLABEL = \"label\"\n\nFEATURES: List[str] = [\n    \"f_hour\", \"f_dow\", \"f_month\", \"f_week\", \"f_is_weekend\", \"f_days_into_period\",\n    \"f_distance\", \"f_block_minutes\", \"f_taxi_out\", \"f_departure_delay\",\n    \"f_arrival_delay\", \"f_diverted\", \"f_block_speed\",\n    \"f_operator\", \"f_from_home\", \"f_fleet_size\",\n    \"f_origin_state\", \"f_dest_state\", \"f_same_state\",\n    \"f_tail_prior_flights\", \"f_tail_prior_groundings\", \"f_tail_grounding_rate\",\n    \"f_tail_days_since_grounding\", \"f_tail_tenure_days\", \"f_tail_mean_dep_delay\",\n    \"f_origin_prior_flights\", \"f_origin_grounding_rate\",\n    \"f_dest_prior_flights\", \"f_dest_grounding_rate\",\n    \"f_operator_rate\", \"f_route_rate\", \"f_station_rate\",\n    \"f_recent_grounding_rate\", \"f_days_since_prev_flight\", \"f_recent_dep_delay\",\n    \"f_tail_vs_portfolio\", \"f_origin_vs_portfolio\", \"f_operator_vs_portfolio\",\n]\n\n\ndef drop_label(df):\n    return df.drop(columns=[LABEL], errors=\"ignore\")\n\"\"\"What the fit window knows about the airports at each end.\"\"\"\nfrom __future__ import annotations\n\nimport numpy as np\nimport pandas as pd\n\n\ndef add(df, fit_flights, groundings, fleet, fit_end, portfolio):\n    raise NotImplementedError\n\"\"\"Where the leg starts and ends.\"\"\"\nfrom __future__ import annotations\n\nimport numpy as np\nimport pandas as pd\n\n\ndef add(df, stations):\n    ref = stations.set_index(\"code\")\n    states = sorted(stations[\"state\"].dropna().unique())\n    codes = {name: float(i) for i, name in enumerate(states)}\n    out = df.copy()\n    origin_state = out[\"origin\"].map(ref[\"state\"])\n    dest_state = out[\"destination\"].map(ref[\"state\"])\n    out[\"f_origin_state\"] = origin_state.map(codes).fillna(-1.0).astype(\"float64\")\n    out[\"f_dest_state\"] = dest_state.map(codes).fillna(-1.0).astype(\"float64\")\n    out[\"f_same_state\"] = (origin_state == dest_state).astype(\"float64\")\n    return out\n\"\"\"What the fit window knows about the aircraft.\"\"\"\nfrom __future__ import annotations\n\nimport numpy as np\nimport pandas as pd\n\n\ndef history(fit_flights, groundings, fit_end):\n    raise NotImplementedError\n\n\ndef add(df, hist, portfolio):\n    raise NotImplementedError\n\"\"\"Sanity checks run before the scores are published.\"\"\"\nfrom __future__ import annotations\n\nimport numpy as np\nimport pandas as pd\n\n\ndef check(scores):\n    if scores.empty:\n        raise ValueError(\"no rows were scored\")\n    if scores[\"flight_id\"].duplicated().any():\n        raise ValueError(\"scored output repeats flight_id\")\n    risk = scores[\"risk_score\"]\n    if not np.isfinite(risk).all():\n        raise ValueError(\"risk_score carries values that are not"
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_01M1Uei3PSmJrRAe5GimDG4U",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"cd data && zcat flights.csv.gz | head -3 && zcat flights.csv.gz | wc -l && zcat groundings.csv.gz | head -5 && zcat groundings.csv.gz | wc -l && head -3 fleet.csv stations.csv\"}"
+        }
+      },
+      {
+        "id": "toolu_01F3foRzDm53oMFLkoQdguZi",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"head -5 reference/scores_reference.csv && wc -l reference/scores_reference.csv && cat reference/run_report.json && python3 -c \\\"import sklearn; print(sklearn.__version__)\\\"\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01M1Uei3PSmJrRAe5GimDG4U",
+    "name": "bash",
+    "content": "flight_id,tail_number,operator,origin,destination,departed_at,block_minutes,distance_miles,taxi_out_minutes,departure_delay,arrival_delay,diverted\nF00000001,N341SV,AA,DEN,MIA,2024-01-01 00:28:00,228.0,1709.0,14.0,-12.0,-35.0,0\nF00000002,N727TW,DL,SLC,ATL,2024-01-01 00:29:00,230.0,1590.0,18.0,-7.0,-33.0,0\n575330\ntail_number,occurred_at,reason_code\nN8329B,2024-01-01 05:35:00,A\nN8301J,2024-01-01 06:30:00,A\nN175SY,2024-01-01 08:00:00,B\nN175SY,2024-01-01 09:00:00,B\n7247\n==> fleet.csv <==\ntail_number,operator,home_station\nN101DQ,DL,ATL\nN101DU,DL,SLC\n\n==> stations.csv <==\ncode,city,state\nABE,\"Allentown/Bethlehem/Easton, PA\",PA\nABQ,\"Albuquerque, NM\",NM"
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01F3foRzDm53oMFLkoQdguZi",
+    "name": "bash",
+    "content": "flight_id,tail_number,departed_at,risk_score,watch\nF00213457,N991AU,2024-02-05 00:18:00,0.000211,0\nF00213458,N451AN,2024-02-05 00:24:00,0.000306,0\nF00213459,N526DE,2024-02-05 00:40:00,9.4e-05,0\nF00213460,N352PS,2024-02-05 00:43:00,4.9e-05,0\n24818 reference/scores_reference.csv\n{\n  \"fit_window\": {\n    \"from\": \"2024-01-01\",\n    \"to\": \"2024-02-15\"\n  },\n  \"mean_score\": 0.011374,\n  \"rows_scored\": 24817,\n  \"score_window\": {\n    \"from\": \"2024-02-05\",\n    \"to\": \"2024-02-08\"\n  },\n  \"watch_rate\": 0.027683\n}\n1.7.2"
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_01VDaBMdp3JfPAXH6DUe3Rht",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"cd data && zcat flights.csv.gz | tail -2 && zcat groundings.csv.gz | tail -2 && python3 - <<'EOF'\\nimport pandas as pd\\nf = pd.read_csv('flights.csv.gz', parse_dates=['departed_at'])\\nprint(f['departed_at'].min(), f['departed_at'].max())\\nprint(f.dtypes)\\nprint(f['diverted'].unique())\\nEOF\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01VDaBMdp3JfPAXH6DUe3Rht",
+    "name": "bash",
+    "content": "F00575328,N972NN,AA,FAT,DFW,2024-03-31 23:59:00,187.0,1313.0,14.0,0.0,-6.0,0\nF00575329,N989AU,AA,PDX,DFW,2024-03-31 23:59:00,222.0,1616.0,10.0,153.0,145.0,0\nN8581Z,2024-03-31 19:40:00,A\nN951NN,2024-03-31 23:45:00,A\n2024-01-01 00:28:00 2024-03-31 23:59:00\nflight_id                   object\ntail_number                 object\noperator                    object\norigin                      object\ndestination                 object\ndeparted_at         datetime64[ns]\nblock_minutes              float64\ndistance_miles             float64\ntaxi_out_minutes           float64\ndeparture_delay            float64\narrival_delay              float64\ndiverted                     int64\ndtype: object\n[0 1]"
+  },
+  {
+    "role": "assistant",
+    "content": "Now I have the full picture. Five stripped modules: `observation`, `tail_history`, `station_history`, `recent`, `reliability`. Let me write initial implementations.",
+    "tool_calls": [
+      {
+        "id": "toolu_015yhcC3mzeTCms1DMB8YabD",
+        "type": "function",
+        "function": {
+          "name": "write_file",
+          "arguments": "{\"path\": \"src/fleetrisk/observation.py\", \"content\": \"\\\"\\\"\\\"Labelling, and the subset of the export the desk fits on.\\\"\\\"\\\"\\nfrom __future__ import annotations\\n\\nimport numpy as np\\nimport pandas as pd\\n\\n\\ndef attach_label(flights, groundings, window_days):\\n    \\\"\\\"\\\"A flight is at risk if its aircraft is grounded within window_days of leaving.\\\"\\\"\\\"\\n    horizon = pd.Timedelta(days=window_days)\\n    g = groundings.sort_values(\\\"occurred_at\\\", kind=\\\"stable\\\")\\n    f = flights.sort_values(\\\"departed_at\\\", kind=\\\"stable\\\")\\n    merged = pd.merge_asof(\\n        f, g[[\\\"tail_number\\\", \\\"occurred_at\\\"]],\\n        left_on=\\\"departed_at\\\", right_on=\\\"occurred_at\\\",\\n        by=\\\"tail_number\\\", direction=\\\"forward\\\", allow_exact_matches=True)\\n    label = (merged[\\\"occurred_at\\\"].notna()\\n             & (merged[\\\"occurred_at\\\"] <= merged[\\\"departed_at\\\"] + horizon))\\n    merged = merged.drop(columns=[\\\"occurred_at\\\"])\\n    merged[\\\"label\\\"] = label.astype(\\\"int64\\\")\\n    return merged\\n\\n\\ndef observed(df, fit_spec, export_end, window_days):\\n    \\\"\\\"\\\"A flight is usable for fitting only when its outcome is settled by the\\n    history the service is allowed to read: the label window has to close by\\n    the end of the fit window (and of the export).\\\"\\\"\\\"\\n    fit_hi = (pd.Timestamp(fit_spec[\\\"to\\\"]) + pd.Timedelta(days=1)\\n              - pd.Timedelta(seconds=1))\\n    cutoff = min(fit_hi, pd.Timestamp(export_end))\\n    horizon = pd.Timedelta(days=window_days)\\n    return (df[\\\"departed_at\\\"] + horizon) <= cutoff\\n\"}"
+        }
+      },
+      {
+        "id": "toolu_014yXTFH3jxxFay7uKrgsdUb",
+        "type": "function",
+        "function": {
+          "name": "write_file",
+          "arguments": "{\"path\": \"src/fleetrisk/tail_history.py\", \"content\": \"\\\"\\\"\\\"What the fit window knows about the aircraft.\\\"\\\"\\\"\\nfrom __future__ import annotations\\n\\nimport numpy as np\\nimport pandas as pd\\n\\n\\ndef history(fit_flights, groundings, fit_end):\\n    fit_end = pd.Timestamp(fit_end)\\n    seen = groundings[groundings[\\\"occurred_at\\\"] <= fit_end]\\n\\n    per_tail = fit_flights.groupby(\\\"tail_number\\\").agg(\\n        flights=(\\\"flight_id\\\", \\\"size\\\"),\\n        first_seen=(\\\"departed_at\\\", \\\"min\\\"),\\n        dep_delay=(\\\"departure_delay\\\", \\\"mean\\\"))\\n    per_ground = seen.groupby(\\\"tail_number\\\").agg(\\n        groundings=(\\\"occurred_at\\\", \\\"size\\\"),\\n        last_grounding=(\\\"occurred_at\\\", \\\"max\\\"))\\n\\n    hist = per_tail.join(per_ground, how=\\\"left\\\")\\n    hist[\\\"groundings\\\"] = hist[\\\"groundings\\\"].fillna(0.0).astype(\\\"float64\\\")\\n    hist[\\\"rate\\\"] = hist[\\\"groundings\\\"] / hist[\\\"flights\\\"]\\n    since = (fit_end - hist[\\\"last_grounding\\\"]).dt.total_seconds() / 86400.0\\n    hist[\\\"days_since_grounding\\\"] = since.fillna(-1.0)\\n    hist[\\\"tenure\\\"] = (fit_end - hist[\\\"first_seen\\\"]).dt.total_seconds() / 86400.0\\n    return hist\\n\\n\\ndef add(df, hist, portfolio):\\n    out = df.copy()\\n    tail = out[\\\"tail_number\\\"]\\n    out[\\\"f_tail_prior_flights\\\"] = tail.map(hist[\\\"flights\\\"]).fillna(0.0).astype(\\\"float64\\\")\\n    out[\\\"f_tail_prior_groundings\\\"] = tail.map(hist[\\\"groundings\\\"]).fillna(0.0).astype(\\\"float64\\\")\\n    out[\\\"f_tail_grounding_rate\\\"] = tail.map(hist[\\\"rate\\\"]).fillna(portfolio[\\\"rate\\\"]).astype(\\\"float64\\\")\\n    out[\\\"f_tail_days_since_grounding\\\"] = tail.map(hist[\\\"days_since_grounding\\\"]).fillna(-1.0).astype(\\\"float64\\\")\\n    out[\\\"f_tail_tenure_days\\\"] = tail.map(hist[\\\"tenure\\\"]).fillna(portfolio[\\\"tenure\\\"]).astype(\\\"float64\\\")\\n    out[\\\"f_tail_mean_dep_delay\\\"] = tail.map(hist[\\\"dep_delay\\\"]).fillna(portfolio[\\\"dep_delay\\\"]).astype(\\\"float64\\\")\\n    return out\\n\"}"
+        }
+      },
+      {
+        "id": "toolu_01T62xDtpBgbVErv61kxoSqP",
+        "type": "function",
+        "function": {
+          "name": "write_file",
+          "arguments": "{\"path\": \"src/fleetrisk/station_history.py\", \"content\": \"\\\"\\\"\\\"What the fit window knows about the airports at each end.\\\"\\\"\\\"\\nfrom __future__ import annotations\\n\\nimport numpy as np\\nimport pandas as pd\\n\\n\\ndef add(df, fit_flights, groundings, fleet, fit_end, portfolio):\\n    fit_end = pd.Timestamp(fit_end)\\n    seen = groundings[groundings[\\\"occurred_at\\\"] <= fit_end]\\n\\n    home = fleet.set_index(\\\"tail_number\\\")[\\\"home_station\\\"]\\n    grounded_at = seen[\\\"tail_number\\\"].map(home).value_counts()\\n    flights_from = fit_flights.groupby(\\\"origin\\\")[\\\"flight_id\\\"].size()\\n    rate = grounded_at.reindex(flights_from.index).fillna(0.0) / flights_from\\n\\n    out = df.copy()\\n    out[\\\"f_origin_prior_flights\\\"] = out[\\\"origin\\\"].map(flights_from).fillna(0.0).astype(\\\"float64\\\")\\n    out[\\\"f_origin_grounding_rate\\\"] = out[\\\"origin\\\"].map(rate).fillna(portfolio[\\\"rate\\\"]).astype(\\\"float64\\\")\\n    out[\\\"f_dest_prior_flights\\\"] = out[\\\"destination\\\"].map(flights_from).fillna(0.0).astype(\\\"float64\\\")\\n    out[\\\"f_dest_grounding_rate\\\"] = out[\\\"destination\\\"].map(rate).fillna(portfolio[\\\"rate\\\"]).astype(\\\"float64\\\")\\n    return out\\n\"}"
+        }
+      },
+      {
+        "id": "toolu_01RxJpfCjaUcQJimGVFbY324",
+        "type": "function",
+        "function": {
+          "name": "write_file",
+          "arguments": "{\"path\": \"src/fleetrisk/recent.py\", \"content\": \"\\\"\\\"\\\"How the aircraft has been behaving lately, rather than over the whole window.\\\"\\\"\\\"\\nfrom __future__ import annotations\\n\\nimport numpy as np\\nimport pandas as pd\\n\\nRECENT_FLIGHTS = 20\\nFORTNIGHT_DAYS = 14\\n\\n\\ndef add(df, fit_flights, groundings, fit_end, portfolio):\\n    fit_end = pd.Timestamp(fit_end)\\n    lo = fit_end - pd.Timedelta(days=FORTNIGHT_DAYS)\\n\\n    fit = fit_flights.sort_values(\\\"departed_at\\\", kind=\\\"stable\\\")\\n    per_tail = fit.groupby(\\\"tail_number\\\")\\n\\n    recent_flights = fit[fit[\\\"departed_at\\\"] > lo].groupby(\\\"tail_number\\\").size()\\n    recent_groundings = groundings[\\n        (groundings[\\\"occurred_at\\\"] > lo) & (groundings[\\\"occurred_at\\\"] <= fit_end)\\n    ].groupby(\\\"tail_number\\\").size()\\n\\n    tails = per_tail.size().index\\n    rf = recent_flights.reindex(tails).fillna(0.0)\\n    rg = recent_groundings.reindex(tails).fillna(0.0)\\n    recent_rate = pd.Series(np.where(rf > 0, rg / rf.replace(0.0, np.nan), 0.0),\\n                            index=tails)\\n\\n    last_seen = per_tail[\\\"departed_at\\\"].max()\\n    gap = (fit_end - last_seen).dt.total_seconds() / 86400.0\\n\\n    last_legs = per_tail.tail(RECENT_FLIGHTS)\\n    recent_delay = last_legs.groupby(\\\"tail_number\\\")[\\\"departure_delay\\\"].mean()\\n\\n    out = df.copy()\\n    tail = out[\\\"tail_number\\\"]\\n    out[\\\"f_recent_grounding_rate\\\"] = tail.map(recent_rate).fillna(portfolio[\\\"rate\\\"]).astype(\\\"float64\\\")\\n    out[\\\"f_days_since_prev_flight\\\"] = tail.map(gap).fillna(portfolio[\\\"gap\\\"]).astype(\\\"float64\\\")\\n    out[\\\"f_recent_dep_delay\\\"] = tail.map(recent_delay).fillna(portfolio[\\\"dep_delay\\\"]).astype(\\\"float64\\\")\\n    return out\\n\"}"
+        }
+      },
+      {
+        "id": "toolu_01X1imbmEWois7RW4Q7FeHhR",
+        "type": "function",
+        "function": {
+          "name": "write_file",
+          "arguments": "{\"path\": \"src/fleetrisk/reliability.py\", \"content\": \"\\\"\\\"\\\"Grounding rates by operator, by route and by station.\\n\\nA rate over thin history says more about the thinness than about the risk, so each one\\nis pulled toward the portfolio rate in proportion to how little stands behind it.\\n\\\"\\\"\\\"\\nfrom __future__ import annotations\\n\\nimport numpy as np\\nimport pandas as pd\\n\\nCATCH_ALL = \\\"__unseen__\\\"\\n\\n\\ndef rate_table(fit_df, key, smoothing, prior):\\n    grouped = fit_df.groupby(key)[\\\"label\\\"].agg([\\\"sum\\\", \\\"size\\\"])\\n    smoothing = float(smoothing)\\n    prior = float(prior)\\n    rates = (grouped[\\\"sum\\\"] + smoothing * prior) / (grouped[\\\"size\\\"] + smoothing)\\n    rates.loc[CATCH_ALL] = prior\\n    return rates.astype(\\\"float64\\\")\\n\\n\\ndef route_key(df):\\n    return df[\\\"origin\\\"].astype(str) + \\\"->\\\" + df[\\\"destination\\\"].astype(str)\\n\\n\\ndef add(df, operator_rates, route_rates, station_rates):\\n    out = df.copy()\\n    out[\\\"f_operator_rate\\\"] = (out[\\\"operator\\\"].map(operator_rates)\\n                              .fillna(operator_rates[CATCH_ALL]).astype(\\\"float64\\\"))\\n    out[\\\"f_route_rate\\\"] = (out[\\\"_route\\\"].map(route_rates)\\n                           .fillna(route_rates[CATCH_ALL]).astype(\\\"float64\\\"))\\n    out[\\\"f_station_rate\\\"] = (out[\\\"origin\\\"].map(station_rates)\\n                             .fillna(station_rates[CATCH_ALL]).astype(\\\"float64\\\"))\\n    return out\\n\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_015yhcC3mzeTCms1DMB8YabD",
+    "name": "write_file",
+    "content": "{\"ok\": true, \"wrote\": \"/workspace/target/src/fleetrisk/observation.py\", \"bytes\": 1396}"
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_014yXTFH3jxxFay7uKrgsdUb",
+    "name": "write_file",
+    "content": "{\"ok\": true, \"wrote\": \"/workspace/target/src/fleetrisk/tail_history.py\", \"bytes\": 1716}"
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01T62xDtpBgbVErv61kxoSqP",
+    "name": "write_file",
+    "content": "{\"ok\": true, \"wrote\": \"/workspace/target/src/fleetrisk/station_history.py\", \"bytes\": 1019}"
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01RxJpfCjaUcQJimGVFbY324",
+    "name": "write_file",
+    "content": "{\"ok\": true, \"wrote\": \"/workspace/target/src/fleetrisk/recent.py\", \"bytes\": 1554}"
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01X1imbmEWois7RW4Q7FeHhR",
+    "name": "write_file",
+    "content": "{\"ok\": true, \"wrote\": \"/workspace/target/src/fleetrisk/reliability.py\", \"bytes\": 1272}"
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_01MopmsFuYhhoZgwpuXAbkFA",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"python3 run_scoring.py --config configs/reference.yaml --out out/reference && python3 tools/compare_scores.py reference/scores_reference.csv out/reference/scores.csv\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01MopmsFuYhhoZgwpuXAbkFA",
+    "name": "bash",
+    "content": "scored 24817 rows, watching 678\nrows 24817, agree 283 (0.011403), max abs diff 0.190126\nflight_id  risk_score_left  risk_score_right     diff\nF00231144         0.637292          0.447166 0.190126\nF00227203         0.265175          0.445496 0.180321\nF00213655         0.466408          0.297523 0.168885\nF00221796         0.201493          0.358885 0.157392\nF00232464         0.562866          0.406391 0.156475\nF00214976         0.292738          0.141611 0.151127\nF00220946         0.235714          0.384608 0.148894\nF00237754         0.368881          0.511140 0.142259\nF00226861         0.179681          0.321420 0.141739\nF00214021         0.615747          0.477538 0.138209"
+  },
+  {
+    "role": "assistant",
+    "content": "The pipeline structure is close but not exact \u2014 several definitional ambiguities to resolve. Let me build a harness that tests variants of the ambiguous choices.",
+    "tool_calls": [
+      {
+        "id": "toolu_019uCv99RVcgSd51hgCbSySr",
+        "type": "function",
+        "function": {
+          "name": "write_file",
+          "arguments": "{\"path\": \"probe.py\", \"content\": \"import itertools, sys, time\\nfrom pathlib import Path\\nimport numpy as np\\nimport pandas as pd\\n\\nsys.path.insert(0, str(Path(__file__).resolve().parent / \\\"src\\\"))\\nfrom fleetrisk import (assemble, calendar_feats, config, deviations, fleet_profile,\\n                       io_layer, model, portfolio, route_feats, station_profile)\\n\\ncfg = config.load(\\\"configs/reference.yaml\\\")\\nflights = io_layer.read_flights(cfg)\\ngroundings = io_layer.read_groundings(cfg)\\nfleet = io_layer.read_fleet(cfg)\\nstations = io_layer.read_stations(cfg)\\nwindow_days = cfg[\\\"labelling\\\"][\\\"window_days\\\"]\\nexport_end = flights[\\\"departed_at\\\"].max()\\nperiod_start = flights[\\\"departed_at\\\"].min()\\nref = pd.read_csv(\\\"reference/scores_reference.csv\\\")\\n\\ndef window(df, spec):\\n    lo = pd.Timestamp(spec[\\\"from\\\"])\\n    hi = pd.Timestamp(spec[\\\"to\\\"]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)\\n    return df[(df[\\\"departed_at\\\"] >= lo) & (df[\\\"departed_at\\\"] <= hi)]\\n\\ndef attach_label(exact):\\n    horizon = pd.Timedelta(days=window_days)\\n    g = groundings.sort_values(\\\"occurred_at\\\", kind=\\\"stable\\\")\\n    f = flights.sort_values(\\\"departed_at\\\", kind=\\\"stable\\\")\\n    m = pd.merge_asof(f, g[[\\\"tail_number\\\", \\\"occurred_at\\\"]],\\n                      left_on=\\\"departed_at\\\", right_on=\\\"occurred_at\\\",\\n                      by=\\\"tail_number\\\", direction=\\\"forward\\\",\\n                      allow_exact_matches=exact)\\n    lab = (m[\\\"occurred_at\\\"].notna() & (m[\\\"occurred_at\\\"] <= m[\\\"departed_at\\\"] + horizon))\\n    m = m.drop(columns=[\\\"occurred_at\\\"])\\n    m[\\\"label\\\"] = lab.astype(\\\"int64\\\")\\n    return m.sort_values(\\\"flight_id\\\", kind=\\\"stable\\\").reset_index(drop=True)\\n\\nCATCH_ALL = \\\"__unseen__\\\"\\ndef rate_table(fit_df, key, smoothing, prior):\\n    grouped = fit_df.groupby(key)[\\\"label\\\"].agg([\\\"sum\\\", \\\"size\\\"])\\n    rates = (grouped[\\\"sum\\\"] + smoothing * prior) / (grouped[\\\"size\\\"] + smoothing)\\n    rates.loc[CATCH_ALL] = prior\\n    return rates.astype(\\\"float64\\\")\\n\\ndef build(v):\\n    labelled = attach_label(v[\\\"exact\\\"])\\n    fit_raw = window(labelled, cfg[\\\"windows\\\"][\\\"fit\\\"])\\n    fit_hi = pd.Timestamp(cfg[\\\"windows\\\"][\\\"fit\\\"][\\\"to\\\"]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)\\n    if v[\\\"observed\\\"] == \\\"eod\\\":\\n        cutoff = min(fit_hi, export_end)\\n    else:  # midnight of 'to'\\n        cutoff = pd.Timestamp(cfg[\\\"windows\\\"][\\\"fit\\\"][\\\"to\\\"])\\n    fit_raw = fit_raw[(fit_raw[\\\"departed_at\\\"] + pd.Timedelta(days=window_days)) <= cutoff]\\n    fit_raw = fit_raw.reset_index(drop=True)\\n    score_raw = window(labelled, cfg[\\\"windows\\\"][\\\"score\\\"]).reset_index(drop=True)\\n    fit_end = fit_raw[\\\"departed_at\\\"].max()\\n    levels = portfolio.levels(fit_raw, groundings, fit_end)\\n    seen = groundings[groundings[\\\"occurred_at\\\"] <= fit_end]\\n\\n    # tail history\\n    per_tail = fit_raw.groupby(\\\"tail_number\\\").agg(\\n        flights=(\\\"flight_id\\\", \\\"size\\\"), first_seen=(\\\"departed_at\\\", \\\"min\\\"),\\n        last_seen=(\\\"departed_at\\\", \\\"max\\\"), dep_delay=(\\\"departure_delay\\\", \\\"mean\\\"))\\n    per_g = seen.groupby(\\\"tail_number\\\").agg(groundings=(\\\"occurred_at\\\", \\\"size\\\"),\\n                                            last_grounding=(\\\"occurred_at\\\", \\\"max\\\"))\\n    hist = per_tail.join(per_g, how=\\\"left\\\")\\n    hist[\\\"groundings\\\"] = hist[\\\"groundings\\\"].fillna(0.0)\\n    hist[\\\"rate\\\"] = hist[\\\"groundings\\\"] / hist[\\\"flights\\\"]\\n    hist[\\\"dsg\\\"] = ((fit_end - hist[\\\"last_grounding\\\"]).dt.total_seconds() / 86400.0).fillna(-1.0)\\n    hist[\\\"tenure\\\"] = (fit_end - hist[\\\"first_seen\\\"]).dt.total_seconds() / 86400.0\\n    hist[\\\"gap\\\"] = (fit_end - hist[\\\"last_seen\\\"]).dt.total_seconds() / 86400.0\\n\\n    home = fleet.set_index(\\\"tail_number\\\")[\\\"home_station\\\"]\\n    g_at = seen[\\\"tail_number\\\"].map(home).value_counts()\\n    fl_from = fit_raw.groupby(\\\"origin\\\")[\\\"flight_id\\\"].size()\\n    if v[\\\"st_denom\\\"] == \\\"from\\\":\\n        st_rate = g_at.reindex(fl_from.index).fillna(0.0) / fl_from\\n    else:  # flights flown by based tails\\n        based = fit_raw[\\\"tail_number\\\"].map(home)\\n        fl_based = fit_raw.groupby(based)[\\\"flight_id\\\"].size()\\n        st_rate = (g_at.reindex(fl_based.index).fillna(0.0) / fl_based).reindex(fl_from.index)\\n\\n    lo = fit_end - pd.Timedelta(days=14)\\n    rf = fit_raw[fit_raw[\\\"departed_at\\\"] > lo].groupby(\\\"tail_number\\\").size()\\n    rg = groundings[(groundings[\\\"occurred_at\\\"] > lo) & (groundings[\\\"occurred_at\\\"] <= fit_end)].groupby(\\\"tail_number\\\").size()\\n    tails = per_tail.index\\n    rf = rf.reindex(tails).fillna(0.0); rg = rg.reindex(tails).fillna(0.0)\\n    fill0 = 0.0 if v[\\\"rf0\\\"] == \\\"zero\\\" else levels[\\\"rate\\\"]\\n    rrate = pd.Series(np.where(rf > 0, rg / rf.replace(0.0, np.nan), fill0), index=tails)\\n    rdelay = fit_raw.sort_values(\\\"departed_at\\\", kind=\\\"stable\\\").groupby(\\\"tail_number\\\").tail(20)\\\\\\n                    .groupby(\\\"tail_number\\\")[\\\"departure_delay\\\"].mean()\\n\\n    def prep(frame):\\n        out = calendar_feats.add(frame, period_start)\\n        out = route_feats.add(out)\\n        out = fleet_profile.add(out, fleet)\\n        out = station_profile.add(out, stations)\\n        t = out[\\\"tail_number\\\"]\\n        out[\\\"f_tail_prior_flights\\\"] = t.map(hist[\\\"flights\\\"]).fillna(0.0)\\n        out[\\\"f_tail_prior_groundings\\\"] = t.map(hist[\\\"groundings\\\"]).fillna(0.0)\\n        out[\\\"f_tail_grounding_rate\\\"] = t.map(hist[\\\"rate\\\"]).fillna(levels[\\\"rate\\\"])\\n        out[\\\"f_tail_days_since_grounding\\\"] = t.map(hist[\\\"dsg\\\"]).fillna(-1.0)\\n        out[\\\"f_tail_tenure_days\\\"] = t.map(hist[\\\"tenure\\\"]).fillna(levels[\\\"tenure\\\"])\\n        out[\\\"f_tail_mean_dep_delay\\\"] = t.map(hist[\\\"dep_delay\\\"]).fillna(levels[\\\"dep_delay\\\"])\\n        out[\\\"f_origin_prior_flights\\\"] = out[\\\"origin\\\"].map(fl_from).fillna(0.0)\\n        out[\\\"f_origin_grounding_rate\\\"] = out[\\\"origin\\\"].map(st_rate).fillna(levels[\\\"rate\\\"])\\n        out[\\\"f_dest_prior_flights\\\"] = out[\\\"destination\\\"].map(fl_from).fillna(0.0)\\n        out[\\\"f_dest_grounding_rate\\\"] = out[\\\"destination\\\"].map(st_rate).fillna(levels[\\\"rate\\\"])\\n        out[\\\"f_recent_grounding_rate\\\"] = t.map(rrate).fillna(levels[\\\"rate\\\"])\\n        out[\\\"f_days_since_prev_flight\\\"] = t.map(hist[\\\"gap\\\"]).fillna(levels[\\\"gap\\\"])\\n        out[\\\"f_recent_dep_delay\\\"] = t.map(rdelay).fillna(levels[\\\"dep_delay\\\"])\\n        return out\\n\\n    fit_df, score_df = prep(fit_raw), prep(score_raw)\\n    smoothing = cfg[\\\"encoding\\\"][\\\"smoothing\\\"]; base = levels[\\\"rate\\\"]\\n    op = rate_table(fit_df, \\\"operator\\\", smoothing, base)\\n    fit_df[\\\"_route\\\"] = fit_df[\\\"origin\\\"] + \\\">\\\" + fit_df[\\\"destination\\\"]\\n    score_df[\\\"_route\\\"] = score_df[\\\"origin\\\"] + \\\">\\\" + score_df[\\\"destination\\\"]\\n    rt = rate_table(fit_df, \\\"_route\\\", smoothing, base)\\n    st = rate_table(fit_df, \\\"origin\\\", smoothing, base)\\n    for d in (fit_df, score_df):\\n        d[\\\"f_operator_rate\\\"] = d[\\\"operator\\\"].map(op).fillna(op[CATCH_ALL])\\n        d[\\\"f_route_rate\\\"] = d[\\\"_route\\\"].map(rt).fillna(rt[CATCH_ALL])\\n        d[\\\"f_station_rate\\\"] = d[\\\"origin\\\"].map(st).fillna(st[CATCH_ALL])\\n        d[\\\"f_tail_vs_portfolio\\\"] = d[\\\"f_tail_grounding_rate\\\"] - base\\n        d[\\\"f_origin_vs_portfolio\\\"] = d[\\\"f_origin_grounding_rate\\\"] - base\\n        d[\\\"f_operator_vs_portfolio\\\"] = d[\\\"f_operator_rate\\\"] - base\\n    return fit_df, score_df\\n\\nvariants = []\\nfor exact, observed, st_denom, rf0 in itertools.product(\\n        [True, False], [\\\"eod\\\", \\\"mid\\\"], [\\\"from\\\", \\\"based\\\"], [\\\"zero\\\", \\\"prior\\\"]):\\n    variants.append(dict(exact=exact, observed=observed, st_denom=st_denom, rf0=rf0))\\n\\nseen_hash = {}\\nresults = []\\nfor v in variants:\\n    fit_df, score_df = build(v)\\n    X = assemble.matrix(fit_df); Xs = assemble.matrix(score_df)\\n    h = hash((X.tobytes(), Xs.tobytes(), fit_df[\\\"label\\\"].to_numpy().tobytes()))\\n    key = str(v)\\n    if h in seen_hash:\\n        print(key, \\\"== dup of\\\", seen_hash[h]); continue\\n    seen_hash[h] = key\\n    t0 = time.time()\\n    mdl = model.RiskModel(5, 200, 0.08, 6)\\n    mdl.fit(X, fit_df[\\\"label\\\"].astype(\\\"int64\\\").to_numpy())\\n    risk = np.round(mdl.score(Xs), 6)\\n    agree = (np.abs(ref[\\\"risk_score\\\"].to_numpy() - risk) <= 1e-6).mean()\\n    print(key, \\\"fit_rows=%d agree=%.4f maxdiff=%.4g (%.0fs)\\\" % (\\n        len(fit_df), agree, np.abs(ref[\\\"risk_score\\\"].to_numpy() - risk).max(), time.time()-t0))\\n    results.append((agree, key))\\n\\nresults.sort(reverse=True)\\nprint(\\\"BEST:\\\", results[0] if results else None)\\n\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_019uCv99RVcgSd51hgCbSySr",
+    "name": "write_file",
+    "content": "{\"ok\": true, \"wrote\": \"/workspace/target/probe.py\", \"bytes\": 7937}"
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_0116EC2BDEYZfiiuK5wMwSKU",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"cd /workspace/target && timeout 3000 python3 probe.py 2>&1 | tail -30\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_0116EC2BDEYZfiiuK5wMwSKU",
+    "name": "bash",
+    "content": "{\"ok\": false, \"error\": \"tool bash crashed: Command '['docker', 'exec', '-u', 'ubuntu', '-w', '/workspace/target', 'harbor-fleet-risk-scoring-run', 'bash', '-c', 'cd /workspace/target && timeout 3000 python3 probe.py 2>&1 | tail -\"}"
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_01AaPSwrvqLwK8GUWU2ZFPxY",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"cd /workspace/target && nohup python3 probe.py > probe.log 2>&1 & echo started\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01AaPSwrvqLwK8GUWU2ZFPxY",
+    "name": "bash",
+    "content": "started"
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_018zESYNtLm6qj4Yw2qPtRfT",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"sleep 120; cat /workspace/target/probe.log\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_018zESYNtLm6qj4Yw2qPtRfT",
+    "name": "bash",
+    "content": "{\"ok\": false, \"error\": \"tool bash crashed: Command '['docker', 'exec', '-u', 'ubuntu', '-w', '/workspace/target', 'harbor-fleet-risk-scoring-run', 'bash', '-c', 'sleep 120; cat /workspace/target/probe.log']' timed out after 120 s\"}"
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_01TVTPQEvz43vVogRsainuY3",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"sleep 100; cat /workspace/target/probe.log\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01TVTPQEvz43vVogRsainuY3",
+    "name": "bash",
+    "content": "{'exact': True, 'observed': 'eod', 'st_denom': 'from', 'rf0': 'zero'} fit_rows=262881 agree=0.0114 maxdiff=0.1901 (14s)\n{'exact': True, 'observed': 'eod', 'st_denom': 'from', 'rf0': 'prior'} fit_rows=262881 agree=0.0067 maxdiff=0.1712 (14s)\n{'exact': True, 'observed': 'eod', 'st_denom': 'based', 'rf0': 'zero'} fit_rows=262881 agree=0.0061 maxdiff=0.1948 (14s)\n{'exact': True, 'observed': 'eod', 'st_denom': 'based', 'rf0': 'prior'} fit_rows=262881 agree=0.0031 maxdiff=0.1799 (14s)\n{'exact': True, 'observed': 'mid', 'st_denom': 'from', 'rf0': 'zero'} fit_rows=256545 agree=0.0189 maxdiff=0.3364 (14s)\n{'exact': True, 'observed': 'mid', 'st_denom': 'from', 'rf0': 'prior'} fit_rows=256545 agree=0.0160 maxdiff=0.3701 (11s)\n{'exact': True, 'observed': 'mid', 'st_denom': 'based', 'rf0': 'zero'} fit_rows=256545 agree=0.0072 maxdiff=0.3545 (10s)\n{'exact': True, 'observed': 'mid', 'st_denom': 'based', 'rf0': 'prior'} fit_rows=256545 agree=0.0130 maxdiff=0.3797 (10s)\n{'exact': False, 'observed': 'eod', 'st_denom': 'from', 'rf0': 'zero'} fit_rows=262881 agree=0.0066 maxdiff=0.2517 (11s)\n{'exact': False, 'observed': 'eod', 'st_denom': 'from', 'rf0': 'prior'} fit_rows=262881 agree=1.0000 maxdiff=0 (11s)\n{'exact': False, 'observed': 'eod', 'st_denom': 'based', 'rf0': 'zero'} fit_rows=262881 agree=0.0087 maxdiff=0.1774 (11s)\n{'exact': False, 'observed': 'eod', 'st_denom': 'based', 'rf0': 'prior'} fit_rows=262881 agree=0.0095 maxdiff=0.2429 (10s)\n{'exact': False, 'observed': 'mid', 'st_denom': 'from', 'rf0': 'zero'} fit_rows=256545 agree=0.0097 maxdiff=0.3713 (10s)\n{'exact': False, 'observed': 'mid', 'st_denom': 'from', 'rf0': 'prior'} fit_rows=256545 agree=0.0136 maxdiff=0.3494 (10s)\n{'exact': False, 'observed': 'mid', 'st_denom': 'based', 'rf0': 'zero'} fit_rows=256545 agree=0.0102 maxdiff=0.3942 (11s)\n{'exact': False, 'observed': 'mid', 'st_denom': 'based', 'rf0': 'prior'} fit_rows=256545 agree=0.0071 maxdiff=0.3485 (10s)\nBEST: (np.float64(1.0), \"{'exact': False, 'observed': 'eod', 'st_denom': 'from', 'rf0': 'prior'}\")"
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_01QmvFZPBbTJbFHkyPnoq33L",
+        "type": "function",
+        "function": {
+          "name": "write_file",
+          "arguments": "{\"path\": \"src/fleetrisk/observation.py\", \"content\": \"\\\"\\\"\\\"Labelling, and the subset of the export the desk fits on.\\\"\\\"\\\"\\nfrom __future__ import annotations\\n\\nimport numpy as np\\nimport pandas as pd\\n\\n\\ndef attach_label(flights, groundings, window_days):\\n    \\\"\\\"\\\"A flight is at risk if the aircraft that flew it is grounded within\\n    window_days of leaving. The grounding has to fall strictly after departure;\\n    a leg that operated cannot have been grounded at the very moment it left.\\\"\\\"\\\"\\n    horizon = pd.Timedelta(days=window_days)\\n    g = groundings.sort_values(\\\"occurred_at\\\", kind=\\\"stable\\\")\\n    f = flights.sort_values(\\\"departed_at\\\", kind=\\\"stable\\\")\\n    merged = pd.merge_asof(\\n        f, g[[\\\"tail_number\\\", \\\"occurred_at\\\"]],\\n        left_on=\\\"departed_at\\\", right_on=\\\"occurred_at\\\",\\n        by=\\\"tail_number\\\", direction=\\\"forward\\\", allow_exact_matches=False)\\n    label = (merged[\\\"occurred_at\\\"].notna()\\n             & (merged[\\\"occurred_at\\\"] <= merged[\\\"departed_at\\\"] + horizon))\\n    merged = merged.drop(columns=[\\\"occurred_at\\\"])\\n    merged[\\\"label\\\"] = label.astype(\\\"int64\\\")\\n    return merged\\n\\n\\ndef observed(df, fit_spec, export_end, window_days):\\n    \\\"\\\"\\\"A flight is usable for fitting only when its outcome is settled by the\\n    history the service is allowed to read: the label window has to close by\\n    the last second of the fit window (and of the export).\\\"\\\"\\\"\\n    fit_hi = (pd.Timestamp(fit_spec[\\\"to\\\"]) + pd.Timedelta(days=1)\\n              - pd.Timedelta(seconds=1))\\n    cutoff = min(fit_hi, pd.Timestamp(export_end))\\n    horizon = pd.Timedelta(days=window_days)\\n    return (df[\\\"departed_at\\\"] + horizon) <= cutoff\\n\"}"
+        }
+      },
+      {
+        "id": "toolu_01FVENGSVWpZ4cKWuQikZwjX",
+        "type": "function",
+        "function": {
+          "name": "write_file",
+          "arguments": "{\"path\": \"src/fleetrisk/recent.py\", \"content\": \"\\\"\\\"\\\"How the aircraft has been behaving lately, rather than over the whole window.\\\"\\\"\\\"\\nfrom __future__ import annotations\\n\\nimport numpy as np\\nimport pandas as pd\\n\\nRECENT_FLIGHTS = 20\\nFORTNIGHT_DAYS = 14\\n\\n\\ndef add(df, fit_flights, groundings, fit_end, portfolio):\\n    fit_end = pd.Timestamp(fit_end)\\n    lo = fit_end - pd.Timedelta(days=FORTNIGHT_DAYS)\\n\\n    fit = fit_flights.sort_values(\\\"departed_at\\\", kind=\\\"stable\\\")\\n    per_tail = fit.groupby(\\\"tail_number\\\")\\n    tails = per_tail.size().index\\n\\n    recent_flights = fit[fit[\\\"departed_at\\\"] > lo].groupby(\\\"tail_number\\\").size()\\n    recent_groundings = groundings[\\n        (groundings[\\\"occurred_at\\\"] > lo) & (groundings[\\\"occurred_at\\\"] <= fit_end)\\n    ].groupby(\\\"tail_number\\\").size()\\n    rf = recent_flights.reindex(tails).fillna(0.0)\\n    rg = recent_groundings.reindex(tails).fillna(0.0)\\n    # A tail with no flights over the fortnight has no rate of its own; it\\n    # sits at the fleet level rather than at zero.\\n    recent_rate = pd.Series(\\n        np.where(rf > 0, rg / rf.replace(0.0, np.nan), portfolio[\\\"rate\\\"]),\\n        index=tails)\\n\\n    last_seen = per_tail[\\\"departed_at\\\"].max()\\n    gap = (fit_end - last_seen).dt.total_seconds() / 86400.0\\n\\n    last_legs = per_tail.tail(RECENT_FLIGHTS)\\n    recent_delay = last_legs.groupby(\\\"tail_number\\\")[\\\"departure_delay\\\"].mean()\\n\\n    out = df.copy()\\n    tail = out[\\\"tail_number\\\"]\\n    out[\\\"f_recent_grounding_rate\\\"] = tail.map(recent_rate).fillna(portfolio[\\\"rate\\\"]).astype(\\\"float64\\\")\\n    out[\\\"f_days_since_prev_flight\\\"] = tail.map(gap).fillna(portfolio[\\\"gap\\\"]).astype(\\\"float64\\\")\\n    out[\\\"f_recent_dep_delay\\\"] = tail.map(recent_delay).fillna(portfolio[\\\"dep_delay\\\"]).astype(\\\"float64\\\")\\n    return out\\n\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01QmvFZPBbTJbFHkyPnoq33L",
+    "name": "write_file",
+    "content": "{\"ok\": true, \"wrote\": \"/workspace/target/src/fleetrisk/observation.py\", \"bytes\": 1552}"
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01FVENGSVWpZ4cKWuQikZwjX",
+    "name": "write_file",
+    "content": "{\"ok\": true, \"wrote\": \"/workspace/target/src/fleetrisk/recent.py\", \"bytes\": 1682}"
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_01AL7QfmL4trKaU37dY5ZgzN",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"cd /workspace/target && nohup bash -c \\\"python3 run_scoring.py --config configs/reference.yaml --out out/reference && python3 tools/compare_scores.py reference/scores_reference.csv out/reference/scores.csv && python3 run_scoring.py --config configs/current.yaml --out out/current\\\" > run.log 2>&1 & echo ok\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01AL7QfmL4trKaU37dY5ZgzN",
+    "name": "bash",
+    "content": "ok"
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_01Vsn3xfjWLKXdqNp7X8BUch",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"sleep 90; cat /workspace/target/run.log; ls /workspace/target/out/current 2>/dev/null\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01Vsn3xfjWLKXdqNp7X8BUch",
+    "name": "bash",
+    "content": "scored 24817 rows, watching 687\nrows 24817, agree 24817 (1.000000), max abs diff 0\nflight_id  risk_score_left  risk_score_right  diff\nF00238273         0.001176          0.001176   0.0\nF00238257         0.000054          0.000054   0.0\nF00238256         0.000700          0.000700   0.0\nF00238255         0.000042          0.000042   0.0\nF00238254         0.000122          0.000122   0.0\nF00238253         0.000585          0.000585   0.0\nF00238252         0.000211          0.000211   0.0\nF00238251         0.004362          0.004362   0.0\nF00238250         0.000371          0.000371   0.0\nF00238249         0.000442          0.000442   0.0\nscored 47096 rows, watching 5746\nrun_report.json\nscores.csv"
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_01D3y2bhzfL3Ca2RB5Z77pA8",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"cd /workspace/target && diff <(python3 -c \\\"import json;d=json.load(open('reference/run_report.json'));print(json.dumps(d,indent=2,sort_keys=True))\\\") out/reference/run_report.json && python3 - <<'EOF'\\nimport pandas as pd\\na = pd.read_csv('reference/scores_reference.csv'); b = pd.read_csv('out/reference/scores.csv')\\nprint(\\\"watch identical:\\\", (a['watch']==b['watch']).all(), \\\"ids identical:\\\", (a['flight_id']==b['flight_id']).all(), \\\"tails:\\\", (a['tail_number']==b['tail_number']).all(), \\\"dep:\\\", (a['departed_at']==b['departed_at']).all())\\nc = pd.read_csv('out/current/scores.csv'); print(c.head(3)); print(len(c), c['watch'].sum())\\nEOF\\nrm -f probe.py probe.log run.log nohup.out; rm -rf out\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01D3y2bhzfL3Ca2RB5Z77pA8",
+    "name": "bash",
+    "content": "watch identical: True ids identical: True tails: True dep: True\n   flight_id tail_number          departed_at  risk_score  watch\n0  F00528234      N560UW  2024-03-25 00:05:00    0.020005      0\n1  F00528235      N979UY  2024-03-25 00:21:00    0.003698      0\n2  F00528236      N453AA  2024-03-25 00:22:00    0.024704      0\n47096 5746"
+  },
+  {
+    "role": "assistant",
+    "content": "Everything checks out. Verify cleanliness and that no stubs remain:",
+    "tool_calls": [
+      {
+        "id": "toolu_01XVoRvoZSWUtNeUef1sNUXo",
+        "type": "function",
+        "function": {
+          "name": "bash",
+          "arguments": "{\"cmd\": \"cd /workspace/target && grep -rn \\\"NotImplementedError\\\" src/ ; git status 2>/dev/null | head; ls\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01XVoRvoZSWUtNeUef1sNUXo",
+    "name": "bash",
+    "content": "README.md\nSPEC.md\nconfigs\ndata\nreference\nrun_scoring.py\nsrc\ntools"
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "toolu_01SiiB5wnSxaq4WF7mkZP8JQ",
+        "type": "function",
+        "function": {
+          "name": "finish",
+          "arguments": "{}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "toolu_01SiiB5wnSxaq4WF7mkZP8JQ",
+    "name": "finish",
+    "content": "{\"ok\": true, \"finished\": true}"
+  }
+]

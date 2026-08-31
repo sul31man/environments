@@ -1,0 +1,12 @@
+{
+  "nc_constant_score": 0.05,
+  "nc_dispersion_median": 0.05,
+  "nc_do_nothing": 0.05,
+  "nc_hide_via_config": 0.05,
+  "nc_no_history_zero": 0.05,
+  "nc_peak_position": 0.05,
+  "nc_restarts_unpinned": 0.05,
+  "nc_segment_raw_labels": 0.05,
+  "nc_unshrunk_rates": 0.05,
+  "nc_velocity_partial_weeks": 0.05
+}

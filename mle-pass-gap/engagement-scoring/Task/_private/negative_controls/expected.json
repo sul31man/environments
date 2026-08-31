@@ -1,0 +1,11 @@
+{
+  "nc_constant_score": 0.05,
+  "nc_do_nothing": 0.05,
+  "nc_hide_via_config": 0.05,
+  "nc_leaky_history": 0.05,
+  "nc_no_history_zero": 0.05,
+  "nc_recent_window": 0.05,
+  "nc_republish_reference": 0.05,
+  "nc_spread_sample": 0.05,
+  "nc_unsmoothed_rates": 0.05
+}

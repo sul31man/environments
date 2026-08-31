@@ -1,0 +1,16 @@
+{
+  "agree_pass": 0.999,
+  "current": {
+    "agreement": 0.0,
+    "ran": false,
+    "stderr": "Traceback (most recent call last):\n  File \"/tmp/candidate_847eb_26/target/run_scoring.py\", line 35, in <module>\n    main()\n  File \"/tmp/candidate_847eb_26/target/run_scoring.py\", line 25, in main\n    scores, fit_df, score_df = pipeline.run(cfg)\n                               ^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_847eb_26/target/src/engagement/pipeline.py\", line 56, in run\n    fit_df, score_df = build(cfg)\n                       ^^^^^^^^^^\n  File \"/tmp/candidate_847eb_26/target/src/engagement/pipeline.py\", line 23, in build\n    level = portfolio.levels(fit_raw)\n            ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_847eb_26/target/src/engagement/portfolio.py\", line 7, in levels\n    raise NotImplementedError\nNotImplementedError\n"
+  },
+  "reference": {
+    "agreement": 0.0,
+    "ran": false,
+    "stderr": "Traceback (most recent call last):\n  File \"/tmp/candidate_847eb_26/target/run_scoring.py\", line 35, in <module>\n    main()\n  File \"/tmp/candidate_847eb_26/target/run_scoring.py\", line 25, in main\n    scores, fit_df, score_df = pipeline.run(cfg)\n                               ^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_847eb_26/target/src/engagement/pipeline.py\", line 56, in run\n    fit_df, score_df = build(cfg)\n                       ^^^^^^^^^^\n  File \"/tmp/candidate_847eb_26/target/src/engagement/pipeline.py\", line 23, in build\n    level = portfolio.levels(fit_raw)\n            ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_847eb_26/target/src/engagement/portfolio.py\", line 7, in levels\n    raise NotImplementedError\nNotImplementedError\n"
+  },
+  "reward": 0.0,
+  "tolerance": 1e-06
+}
+Final score: 0.0

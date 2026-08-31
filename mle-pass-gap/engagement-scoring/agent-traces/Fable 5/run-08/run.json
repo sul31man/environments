@@ -1,0 +1,33 @@
+{
+  "run": 1,
+  "container": "harbor-engagement-scoring-run",
+  "reward": 1.0,
+  "reason": "",
+  "grader_exit": 0,
+  "net": {},
+  "drive": {
+    "steps": 22,
+    "tool_calls": 29,
+    "stop": "finish() called",
+    "wall_sec": 1540.5,
+    "tokens": {
+      "in": 44,
+      "out": 106104,
+      "cache_read": 398040,
+      "cache_write": 28904
+    },
+    "est_cost_usd": 6.06498,
+    "counts": {
+      "bash": 23,
+      "write_file": 5,
+      "finish": 1,
+      "other": 0
+    },
+    "model": "claude-fable-5",
+    "provider": "anthropic",
+    "arm": "strong",
+    "reasoning": null,
+    "requests": 22,
+    "prices_version": "hud-2026-08-21"
+  }
+}

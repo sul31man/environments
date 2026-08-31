@@ -1,0 +1,16 @@
+{
+  "agree_pass": 0.999,
+  "current": {
+    "agreement": 0.0,
+    "ran": false,
+    "stderr": "mp/candidate_vt1nnf96/target/run_scoring.py\", line 36, in <module>\n    main()\n  File \"/tmp/candidate_vt1nnf96/target/run_scoring.py\", line 26, in main\n    scores, fit_df, score_df = pipeline.run(cfg)\n                               ^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_vt1nnf96/target/src/riskscore/pipeline.py\", line 107, in run\n    fit_df, score_df = build(cfg)\n                       ^^^^^^^^^^\n  File \"/tmp/candidate_vt1nnf96/target/src/riskscore/pipeline.py\", line 51, in build\n    market_price, market_price_prior = price_position.market_mean_price(fit_raw)\n                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_vt1nnf96/target/src/riskscore/price_position.py\", line 7, in market_mean_price\n    raise NotImplementedError\nNotImplementedError\n"
+  },
+  "reference": {
+    "agreement": 0.0,
+    "ran": false,
+    "stderr": "mp/candidate_vt1nnf96/target/run_scoring.py\", line 36, in <module>\n    main()\n  File \"/tmp/candidate_vt1nnf96/target/run_scoring.py\", line 26, in main\n    scores, fit_df, score_df = pipeline.run(cfg)\n                               ^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_vt1nnf96/target/src/riskscore/pipeline.py\", line 107, in run\n    fit_df, score_df = build(cfg)\n                       ^^^^^^^^^^\n  File \"/tmp/candidate_vt1nnf96/target/src/riskscore/pipeline.py\", line 51, in build\n    market_price, market_price_prior = price_position.market_mean_price(fit_raw)\n                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/candidate_vt1nnf96/target/src/riskscore/price_position.py\", line 7, in market_mean_price\n    raise NotImplementedError\nNotImplementedError\n"
+  },
+  "reward": 0.0,
+  "tolerance": 1e-06
+}
+Final score: 0.0

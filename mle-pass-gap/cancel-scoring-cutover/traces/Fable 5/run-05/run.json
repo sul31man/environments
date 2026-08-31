@@ -1,0 +1,32 @@
+{
+  "run": 1,
+  "container": "harbor-cancel-scoring-cutover-run",
+  "reward": 0.0,
+  "reason": "",
+  "grader_exit": 0,
+  "net": {},
+  "drive": {
+    "steps": 150,
+    "tool_calls": 167,
+    "stop": "max steps reached",
+    "wall_sec": 5507.2,
+    "tokens": {
+      "in": 300,
+      "out": 263673,
+      "cache_read": 11268020,
+      "cache_write": 117146
+    },
+    "est_cost_usd": 25.918995,
+    "counts": {
+      "bash": 111,
+      "write_file": 56,
+      "finish": 0,
+      "other": 0
+    },
+    "model": "claude-fable-5",
+    "provider": "anthropic",
+    "arm": "strong",
+    "requests": 150,
+    "prices_version": "hud-2026-08-21"
+  }
+}

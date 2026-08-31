@@ -1,0 +1,33 @@
+{
+  "run": 1,
+  "container": "harbor-fleet-risk-scoring-run",
+  "reward": 0.0,
+  "reason": "",
+  "grader_exit": 0,
+  "net": {},
+  "drive": {
+    "steps": 105,
+    "tool_calls": 106,
+    "stop": "time budget exhausted",
+    "wall_sec": 9025.6,
+    "tokens": {
+      "in": 282505,
+      "out": 267876,
+      "cache_read": 4078976,
+      "cache_write": 0
+    },
+    "est_cost_usd": 3.19201,
+    "counts": {
+      "bash": 77,
+      "write_file": 29,
+      "finish": 0,
+      "other": 0
+    },
+    "model": "qwen/qwen3.8-max",
+    "provider": "openrouter",
+    "arm": "weak",
+    "reasoning": "xhigh",
+    "requests": 104,
+    "prices_version": "2026-08-25"
+  }
+}

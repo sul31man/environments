@@ -1,0 +1,33 @@
+{
+  "run": 1,
+  "container": "harbor-fleet-risk-scoring-run",
+  "reward": 1.0,
+  "reason": "",
+  "grader_exit": 0,
+  "net": {},
+  "drive": {
+    "steps": 96,
+    "tool_calls": 108,
+    "stop": "finish() called",
+    "wall_sec": 6351.5,
+    "tokens": {
+      "in": 192,
+      "out": 301950,
+      "cache_read": 6001428,
+      "cache_write": 121080
+    },
+    "est_cost_usd": 22.614348,
+    "counts": {
+      "bash": 81,
+      "write_file": 26,
+      "finish": 1,
+      "other": 0
+    },
+    "model": "claude-fable-5",
+    "provider": "anthropic",
+    "arm": "probe",
+    "reasoning": null,
+    "requests": 96,
+    "prices_version": "2026-08-25"
+  }
+}

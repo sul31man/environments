@@ -1,0 +1,16 @@
+{
+  "agree_pass": 0.999,
+  "current": {
+    "agreement": 0.0,
+    "ran": false,
+    "stderr": "Traceback (most recent call last):\n  File \"/tmp/candidate_2iehizqq/target/run_scoring.py\", line 12, in <module>\n    from engagement import assemble, config, pipeline, report, validate\n  File \"/tmp/candidate_2iehizqq/target/src/engagement/pipeline.py\", line 5, in <module>\n    from . import (affinity, assemble, calendar_feats, cohort, deviations,\n  File \"/tmp/candidate_2iehizqq/target/src/engagement/affinity.py\", line 5, in <module>\n    from . import history\n  File \"/tmp/candidate_2iehizqq/target/src/engagement/history.py\", line 36\n    idx = merged.groupby(\"_orig\").[\"_n\"].idxmax()\n                                  ^\nSyntaxError: invalid syntax\n"
+  },
+  "reference": {
+    "agreement": 0.0,
+    "ran": false,
+    "stderr": "Traceback (most recent call last):\n  File \"/tmp/candidate_2iehizqq/target/run_scoring.py\", line 12, in <module>\n    from engagement import assemble, config, pipeline, report, validate\n  File \"/tmp/candidate_2iehizqq/target/src/engagement/pipeline.py\", line 5, in <module>\n    from . import (affinity, assemble, calendar_feats, cohort, deviations,\n  File \"/tmp/candidate_2iehizqq/target/src/engagement/affinity.py\", line 5, in <module>\n    from . import history\n  File \"/tmp/candidate_2iehizqq/target/src/engagement/history.py\", line 36\n    idx = merged.groupby(\"_orig\").[\"_n\"].idxmax()\n                                  ^\nSyntaxError: invalid syntax\n"
+  },
+  "reward": 0.0,
+  "tolerance": 1e-06
+}
+Final score: 0.0

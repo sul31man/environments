@@ -1,0 +1,33 @@
+{
+  "run": 1,
+  "container": "harbor-fleet-risk-scoring-run",
+  "reward": 0.0,
+  "reason": "",
+  "grader_exit": 0,
+  "net": {},
+  "drive": {
+    "steps": 74,
+    "tool_calls": 73,
+    "stop": "api error: Expecting value: line 229 column 1 (char 1254)",
+    "wall_sec": 6033.6,
+    "tokens": {
+      "in": 230439,
+      "out": 215953,
+      "cache_read": 2182656,
+      "cache_write": 0
+    },
+    "est_cost_usd": 2.30226,
+    "counts": {
+      "bash": 68,
+      "write_file": 5,
+      "finish": 0,
+      "other": 0
+    },
+    "model": "qwen/qwen3.8-max",
+    "provider": "openrouter",
+    "arm": "weak",
+    "reasoning": "xhigh",
+    "requests": 74,
+    "prices_version": "2026-08-25"
+  }
+}
